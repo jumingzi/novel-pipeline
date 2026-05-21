@@ -1,5 +1,6 @@
 import json
 import pytest
+import httpx
 from pipeline.api_client import DeepSeekClient, fix_json_output
 
 
@@ -112,3 +113,37 @@ async def test_client_progress_callback():
     assert len(events) == 2
     assert events[0]["status"] == "running"
     assert events[1]["status"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_client_retry_on_network_error():
+    """Verify that ConnectError on first attempt triggers retry and succeeds on second."""
+    success = FakeResponse('{"choices": [{"message": {"content": "{\\"ok\\": true}"}}]}')
+    call_count = 0
+
+    class ErrorThenSuccessClient:
+        def __init__(self, success_response):
+            self._success = success_response
+            self.call_count = 0
+
+        async def post(self, url, json=None, headers=None, timeout=None):
+            self.call_count += 1
+            if self.call_count == 1:
+                raise httpx.ConnectError("Connection refused")
+            return self._success
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def aclose(self):
+            pass
+
+    fake_http = ErrorThenSuccessClient(success)
+    client = DeepSeekClient(api_key="sk-test")
+
+    result = await client.call("agent1", [{"role": "user", "content": "hello"}], _client=fake_http)
+    assert result == '{"ok": true}'
+    assert fake_http.call_count == 2

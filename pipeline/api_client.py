@@ -3,7 +3,7 @@ import re
 import time
 import asyncio
 import httpx
-from typing import Optional, Callable
+from typing import Optional, Callable, Awaitable
 from config import (
     AGENT_CONFIG, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL,
     MAX_RETRIES, RETRY_BACKOFF, JSON_FIX_MAX_RETRIES,
@@ -54,7 +54,7 @@ def fix_json_output(raw: str) -> str:
 
 
 class DeepSeekClient:
-    def __init__(self, api_key: Optional[str] = None, progress_callback: Optional[Callable] = None):
+    def __init__(self, api_key: Optional[str] = None, progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None):
         self.api_key = api_key or load_api_key()
         self.progress_callback = progress_callback
 
@@ -151,7 +151,7 @@ class DeepSeekClient:
                                     {"role": "assistant", "content": content},
                                     fix_msg,
                                 ]
-                                content = await self._retry_call(body, headers, _client)
+                                content = await self._single_post(body, headers, _client)
                                 content = fix_json_output(content)
                             else:
                                 raise RuntimeError(f"JSON fix failed after {JSON_FIX_MAX_RETRIES} attempts")
@@ -170,12 +170,15 @@ class DeepSeekClient:
 
         raise RuntimeError(f"Unexpected: {last_error}")
 
-    async def _retry_call(self, body: dict, headers: dict, _client=None) -> str:
-        if _client:
-            resp = await _client.post(API_ENDPOINT, json=body, headers=headers, timeout=HTTP_TIMEOUT)
-        else:
-            async with httpx.AsyncClient() as client:
-                resp = await client.post(API_ENDPOINT, json=body, headers=headers, timeout=HTTP_TIMEOUT)
+    async def _single_post(self, body: dict, headers: dict, _client=None) -> str:
+        try:
+            if _client:
+                resp = await _client.post(API_ENDPOINT, json=body, headers=headers, timeout=HTTP_TIMEOUT)
+            else:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.post(API_ENDPOINT, json=body, headers=headers, timeout=HTTP_TIMEOUT)
+        except (httpx.TimeoutException, httpx.ConnectError) as e:
+            raise RuntimeError(f"Single post failed: {e}")
         if resp.status_code >= 500:
             raise RuntimeError(f"Retry call failed: HTTP {resp.status_code}")
         data = resp.json()

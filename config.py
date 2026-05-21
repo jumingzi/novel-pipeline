@@ -43,7 +43,7 @@ AGENT4_MAX_CONTEXT_TOKENS = 30000
 
 # --- 重试 ---
 MAX_RETRIES = 3
-RETRY_BACKOFF = [2, 4, 8]
+RETRY_BACKOFF = (2, 4, 8)
 JSON_FIX_MAX_RETRIES = 2
 
 # --- HTTP ---
@@ -53,7 +53,7 @@ HTTP_TIMEOUT_STREAMING = 300
 # --- 章节 ---
 DEFAULT_CHAPTER_WORDS = 3000
 
-# --- 12 分类模板名 ---
+# --- 15 分类模板名 ---
 GENRE_TEMPLATES = [
     "玄幻", "仙侠", "武侠", "都市", "轻小说", "恋爱",
     "历史", "军事", "科幻", "奇幻", "游戏", "悬疑",
