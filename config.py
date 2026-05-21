@@ -3,6 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Suppress ChromaDB telemetry errors
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
+
 # --- API (可从环境变量覆盖) ---
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
