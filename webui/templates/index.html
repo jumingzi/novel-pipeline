@@ -584,86 +584,254 @@ function adoptChapter(btn) {
 }
 
 // ============ SSE PROGRESS ============
+const agentLabels = ['文件处理', '拆书分析', '知识归档', 'AI写手'];
 const evtSource = new EventSource('/api/events');
 evtSource.onmessage = function(event) {
   try {
     const data = JSON.parse(event.data);
-    updateProgress(data.agent_id, data.status);
+    updateProgress(data.agent_id, data.status, data.message || '');
+    // Auto-refresh panels when agent finishes
+    if (data.status === 'done') {
+      fetchState();
+    }
   } catch(e) {}
 };
 
-function updateProgress(agentId, status) {
+function updateProgress(agentId, status, message) {
   const dots = document.querySelectorAll('#progressDots .progress-dot');
   const agentMap = { agent1: 0, agent2: 1, agent3: 2, agent4: 3 };
   const idx = agentMap[agentId];
   if (idx === undefined) return;
-  dots.forEach(d => { d.classList.remove('running'); });
-  if (status === 'running') {
-    dots[idx].classList.add('running');
-  } else if (status === 'done') {
-    dots[idx].classList.add('done');
-    dots[idx].classList.remove('running');
-    // If agent3 done, refresh KB panels
-    if (agentId === 'agent3') {
-      refreshAllKBPanels();
-      ['deconstruct-chars','deconstruct-plot','deconstruct-pace'].forEach(id => {
-        const panel = document.getElementById('panel-' + id);
-        if (panel) {
-          const empty = panel.querySelector('.empty-state');
-          if (empty) empty.innerHTML = '<p>分析结果已产出，正在加载...</p>';
-        }
-      });
+  // Don't clear other dots
+  dots.forEach((d, i) => {
+    if (i === idx) {
+      d.classList.remove('running', 'done');
+      if (status === 'running') d.classList.add('running');
+      if (status === 'done') d.classList.add('done');
     }
-    // If agent4 done, show chapter in writer chat
-    if (agentId === 'agent4') {
-      fetchState();
-    }
+  });
+  // Update title
+  dots.forEach((d, i) => { d.title = agentLabels[i]; });
+  // Show message if available
+  if (message && message.length > 0 && message.length < 80) {
+    updateProgressLabel(message);
   }
 }
 
+let progressLabelEl = null;
+function updateProgressLabel(msg) {
+  if (!progressLabelEl) {
+    progressLabelEl = document.createElement('span');
+    progressLabelEl.style.cssText = 'font-size:11px;color:var(--ink-light);margin-left:8px;';
+    const row = document.querySelector('.progress-row');
+    if (row) row.appendChild(progressLabelEl);
+  }
+  progressLabelEl.textContent = msg;
+}
+
 // ============ STATE POLLING ============
+let lastResultHash = '';
+
 async function fetchState() {
   try {
     const res = await fetch('/api/state');
     const data = await res.json();
-    if (data.result) {
-      analysisResult = data.result;
+    if (!data.result) return;
+
+    analysisResult = data.result;
+
+    // Sync progress dots
+    syncProgressDots(data);
+
+    // Check if result changed
+    const hash = JSON.stringify(data.result).substring(0, 200);
+    if (hash === lastResultHash) return;
+    lastResultHash = hash;
+
+    // Populate deconstruct panels
+    if (data.result.decon_results && data.result.decon_results.length > 0) {
+      renderDeconstructResults(data.result.decon_results);
     }
-    if (data.result?.last_chapter) {
-      const msgs = document.getElementById('chatMessages');
-      const empty = msgs.querySelector('.empty-state');
-      if (empty) empty.remove();
-      if (!chatHistory.some(m => m.role === 'assistant' && m.content === data.result.last_chapter)) {
-        msgs.innerHTML += `<div class="message ai">
-          <div class="msg-content">${escapeHtml(data.result.last_chapter)}</div>
-          <div class="msg-actions">
-            <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
-            <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
-            <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
-          </div>
-        </div>`;
-        msgs.scrollTop = msgs.scrollHeight;
-      }
+
+    // Populate KB panels
+    renderKBPanels(data.knowledge_base, data.result.genre);
+
+    // Show new chapter
+    if (data.result.last_chapter) {
+      renderLastChapter(data.result.last_chapter);
     }
   } catch(e) {}
 }
 
-setInterval(fetchState, 5000);
+setInterval(fetchState, 4000);
 
-async function refreshAllKBPanels() {
-  try {
-    const res = await fetch('/api/state');
-    const data = await res.json();
-    const kb = data.knowledge_base || {};
-    document.getElementById('kbCharEmpty').innerHTML = kb.character_count ? '' : '<p>暂无角色数据</p>';
-    document.getElementById('kbTimelineEmpty').innerHTML = kb.foreshadowing_count ? '' : '<p>暂无剧情数据</p>';
-  } catch(e) {}
+// --- Render deconstruct results ---
+function renderDeconstructResults(deconResults) {
+  // Merge all results
+  const allChars = [];
+  const allRels = [];
+  const allHooks = [];
+  const allDopamine = [];
+  const allStyle = [];
+  const allForeshadowing = { planted: [], resolved: [] };
+
+  deconResults.forEach(r => {
+    (r.characters || []).forEach(c => { if (!allChars.find(x => x.name === c.name)) allChars.push(c); });
+    (r.relationships || []).forEach(rel => allRels.push(rel));
+    (r.hooks || []).forEach(h => allHooks.push(h));
+    if (r.dopamine_curve && r.dopamine_curve.type) allDopamine.push(r.dopamine_curve);
+    if (r.style_dna && Object.keys(r.style_dna).length) allStyle.push(r.style_dna);
+    (r.foreshadowing?.planted || []).forEach(f => allForeshadowing.planted.push(f));
+    (r.foreshadowing?.resolved || []).forEach(f => allForeshadowing.resolved.push(f));
+  });
+
+  // 人设分析
+  const charPanel = document.getElementById('panel-deconstruct-chars');
+  if (charPanel) {
+    let html = '<h3>人设分析</h3>';
+    if (allChars.length === 0) {
+      html += '<div class="empty-state"><p>本段未检测到新角色</p></div>';
+    } else {
+      html += allChars.map(c => `
+        <div class="char-card">
+          <strong>${escapeHtml(c.name || '?')}</strong>
+          ${c.explicit_traits ? '<br>特征: ' + escapeHtml(c.explicit_traits) : ''}
+          ${c.hidden_motivation ? '<br>动机: ' + escapeHtml(c.hidden_motivation) : ''}
+          ${c.core_conflict ? '<br>矛盾: ' + escapeHtml(c.core_conflict) : ''}
+        </div>`).join('');
+    }
+    if (allRels.length > 0) {
+      html += '<h3>人物关系</h3>';
+      html += allRels.map(r => `<div class="char-card">
+        ${escapeHtml((r.pair||[]).join(' ↔ '))}: ${escapeHtml(r.type||'')} (亲密度:${r.intimacy||0})
+        ${r.trend ? ' → ' + escapeHtml(r.trend) : ''}
+      </div>`).join('');
+    }
+    charPanel.innerHTML = html;
+  }
+
+  // 剧情分析
+  const plotPanel = document.getElementById('panel-deconstruct-plot');
+  if (plotPanel) {
+    let html = '<h3>剧情分析</h3>';
+    if (allHooks.length === 0) {
+      html += '<div class="empty-state"><p>未检测到明确钩子</p></div>';
+    } else {
+      html += allHooks.map(h => `<div class="char-card">
+        [${escapeHtml(h.type||'')}] 评分:${h.score||'?'}/10 — ${escapeHtml(h.description||'')}
+      </div>`).join('');
+    }
+    // Foreshadowing
+    if (allForeshadowing.planted.length > 0) {
+      html += '<h3>已埋伏笔</h3>';
+      html += allForeshadowing.planted.map(f => `<div class="char-card">${escapeHtml(f.description||'')} (置信度:${f.confidence||'?'})</div>`).join('');
+    }
+    if (allForeshadowing.resolved.length > 0) {
+      html += '<h3>已回收伏笔</h3>';
+      html += allForeshadowing.resolved.map(f => `<div class="char-card">${escapeHtml(f.description||'')}</div>`).join('');
+    }
+    plotPanel.innerHTML = html;
+  }
+
+  // 节奏分析
+  const pacePanel = document.getElementById('panel-deconstruct-pace');
+  if (pacePanel) {
+    let html = '<h3>节奏分析</h3>';
+    if (allDopamine.length > 0) {
+      html += '<h4>爽点/情绪曲线</h4>';
+      html += allDopamine.map(d => `<div class="char-card">
+        类型: ${escapeHtml(d.type||'')} | 强度: ${d.intensity||0} | ${escapeHtml(d.note||'')}
+      </div>`).join('');
+    }
+    if (allStyle.length > 0) {
+      html += '<h4>文风DNA</h4>';
+      const s = allStyle[allStyle.length-1]; // most recent
+      html += `<div class="char-card">
+        成语密度: ${s.idiom_density||'?'} | 对白占比: ${s.dialogue_ratio||'?'} | 平均句长: ${s.avg_sentence_length||'?'}
+        ${s.camera_sequence ? '<br>镜头: ' + escapeHtml(s.camera_sequence) : ''}
+        ${s.sentence_patterns?.length ? '<br>句式指纹: ' + s.sentence_patterns.join(', ') : ''}
+      </div>`;
+    }
+    if (allDopamine.length === 0 && allStyle.length === 0) {
+      html += '<div class="empty-state"><p>节奏数据收集中</p></div>';
+    }
+    pacePanel.innerHTML = html;
+  }
 }
 
-function refreshKBPanel() {
-  if (savedChapters.length === 0) return;
-  const list = savedChapters.map(c => `<div class="chapter-list-item">第${c.chapter}章 — ${c.time}</div>`).join('');
-  // Show in a KB panel if KB panels had a chapter list area
+// --- KB Panels ---
+function renderKBPanels(kbData, genre) {
+  const chars = kbData?.character_count || analysisResult?.character_count || 0;
+
+  if (chars > 0) {
+    document.getElementById('kbCharEmpty').style.display = 'none';
+  }
+
+  // Show chapter count and genre
+  const worldPanel = document.getElementById('panel-kb-world');
+  if (worldPanel && genre) {
+    worldPanel.innerHTML = `<h3>世界观设定</h3>
+      <div class="char-card">题材: <strong>${escapeHtml(genre)}</strong></div>
+      <div class="char-card">已收录角色: ${chars} 人</div>
+      <div class="char-card">伏笔线索: ${kbData?.foreshadowing_count || 0} 条</div>`;
+  }
+
+  // Style panel
+  const stylePanel = document.getElementById('panel-kb-style');
+  if (stylePanel && analysisResult?.decon_results?.length) {
+    const lastStyle = analysisResult.decon_results[analysisResult.decon_results.length-1]?.style_dna;
+    if (lastStyle && Object.keys(lastStyle).length) {
+      stylePanel.innerHTML = `<h3>文风档案</h3>
+        <div class="char-card">成语密度: ${lastStyle.idiom_density||'?'}</div>
+        <div class="char-card">对白占比: ${lastStyle.dialogue_ratio||'?'}</div>
+        <div class="char-card">平均句长: ${lastStyle.avg_sentence_length||'?'}</div>
+        ${lastStyle.camera_sequence ? '<div class="char-card">镜头: '+escapeHtml(lastStyle.camera_sequence)+'</div>' : ''}`;
+    }
+  }
+
+  // Saved chapters list in KB
+  if (savedChapters.length > 0) {
+    const timelinePanel = document.getElementById('panel-kb-timeline');
+    if (timelinePanel) {
+      timelinePanel.innerHTML = '<h3>剧情时间线</h3>' + savedChapters.map(c =>
+        `<div class="chapter-list-item" onclick="openPanel(\'generate-writer\')">第${c.chapter}章 — ${c.time}</div>`
+      ).join('');
+    }
+  }
+}
+
+// --- Chapter display ---
+let lastChapter = '';
+function renderLastChapter(chapter) {
+  if (!chapter || chapter === lastChapter) return;
+  lastChapter = chapter;
+  const msgs = document.getElementById('chatMessages');
+  const empty = msgs.querySelector('.empty-state');
+  if (empty) empty.remove();
+  if (!chatHistory.some(m => m.content === chapter)) {
+    msgs.innerHTML += `<div class="message ai">
+      <div class="msg-content">${escapeHtml(chapter)}</div>
+      <div class="msg-actions">
+        <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
+        <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
+        <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
+      </div>
+    </div>`;
+    chatHistory.push({ role: 'assistant', content: chapter });
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+}
+
+function syncProgressDots(data) {
+  const stepMap = { 'idle': -1, 'agent1': 0, 'agent2': 1, 'agent3': 2, 'agent4': 3 };
+  const current = stepMap[data.current_step] || -1;
+  const dots = document.querySelectorAll('#progressDots .progress-dot');
+  dots.forEach((d, i) => {
+    d.classList.remove('running', 'done');
+    if (i < current) d.classList.add('done');
+    if (i === current && data.progress > 0 && data.progress < 1) d.classList.add('running');
+    if (data.progress >= (i+1)/4) d.classList.add('done');
+  });
 }
 
 // ============ UTILS ============
