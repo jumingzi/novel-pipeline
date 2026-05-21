@@ -90,7 +90,20 @@
 
   </nav>
 
-  <!-- Upload area (shared, inside 拆书>源文件 panel context) -->
+  <!-- 文件上传 (常驻侧边栏) -->
+  <div class="sidebar-upload-section">
+    <div class="sidebar-upload" id="sidebarUploadZone">
+      <span style="font-size:12px;color:var(--ink-light)">拖拽或点击上传源文件</span>
+      <div class="file-name" id="sidebarFileName"></div>
+    </div>
+    <input type="file" class="file-input-hidden" id="fileInput" accept=".txt,.epub,.mobi">
+    <div class="sidebar-upload" id="sidebarRefUploadZone" style="margin-top:4px;">
+      <span style="font-size:12px;color:var(--ink-light)">对标书 (可选)</span>
+      <div class="file-name" id="sidebarRefFileNames"></div>
+    </div>
+    <input type="file" class="file-input-hidden" id="refFileInput" accept=".txt,.epub,.mobi" multiple>
+  </div>
+
   <div class="sidebar-actions">
     <div class="chapter-range">
       章节 <input type="number" id="chStart" value="1" min="1" placeholder="起"> —
@@ -129,20 +142,8 @@
 
     <!-- === 拆书 Panels === -->
     <div class="tab-panel" id="panel-deconstruct-source">
-      <h3>源文件上传</h3>
-      <div class="sidebar-upload" id="uploadZone" style="margin:16px 0;padding:32px;">
-        拖拽 .txt / .epub / .mobi 文件到此处<br>或点击选择文件
-        <div class="file-name" id="sourceFileName"></div>
-      </div>
-      <input type="file" class="file-input-hidden" id="fileInput" accept=".txt,.epub,.mobi">
-      <div style="margin-top:12px;">
-        <span style="font-size:12px;color:var(--ink-light)">对标书：</span>
-        <div class="sidebar-upload" id="refUploadZone" style="margin:8px 0;padding:16px;">
-          拖拽对标书文件
-          <div class="file-name" id="refFileNames"></div>
-        </div>
-        <input type="file" class="file-input-hidden" id="refFileInput" accept=".txt,.epub,.mobi" multiple>
-      </div>
+      <h3>源文件</h3>
+      <p style="font-size:13px;color:var(--ink-light);margin:16px 0;">请在左侧侧边栏上传源文件和对标书。</p>
       <div class="setting-row">
         <label>题材</label>
         <select class="genre-select" id="genreSelect">
@@ -368,9 +369,9 @@ document.querySelectorAll('.nav-item').forEach(item => {
 });
 
 // ============ FILE UPLOAD ============
-const uploadZone = document.getElementById('uploadZone');
+const uploadZone = document.getElementById('sidebarUploadZone');
 const fileInput = document.getElementById('fileInput');
-const refUploadZone = document.getElementById('refUploadZone');
+const refUploadZone = document.getElementById('sidebarRefUploadZone');
 const refFileInput = document.getElementById('refFileInput');
 
 uploadZone.addEventListener('click', () => fileInput.click());
@@ -401,7 +402,7 @@ async function uploadFile(file) {
     const data = await res.json();
     sourceFilePath = data.path;
     sourceFileName = data.filename;
-    document.getElementById('sourceFileName').textContent = '已选择: ' + data.filename;
+    document.getElementById('sidebarFileName').textContent = '已选择: ' + data.filename;
     toast('源文件上传成功');
   } catch(e) { toast('上传失败: ' + e.message); }
 }
@@ -414,7 +415,7 @@ async function uploadRefFile(file) {
     const data = await res.json();
     refFilePaths.push(data.path);
     refFileNames.push(data.filename);
-    document.getElementById('refFileNames').textContent = '已选择: ' + refFileNames.join(', ');
+    document.getElementById('sidebarRefFileNames').textContent = '已选择: ' + refFileNames.join(', ');
     toast('对标书上传成功');
   } catch(e) { toast('上传失败: ' + e.message); }
 }

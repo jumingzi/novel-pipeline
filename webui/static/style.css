@@ -176,6 +176,12 @@ body::before {
 
 .chapter-range input:focus { border-color: var(--cinnabar); }
 
+/* Sidebar upload section (always visible) */
+.sidebar-upload-section {
+  padding: 6px 18px;
+  border-top: 1px solid var(--ink-line);
+}
+
 /* Sidebar upload zone */
 .sidebar-upload {
   margin: 6px 18px 6px 46px;
