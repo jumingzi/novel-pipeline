@@ -26,7 +26,7 @@ def test_chunk_params():
 
 def test_retry_params():
     assert MAX_RETRIES == 3
-    assert RETRY_BACKOFF == [2, 4, 8]
+    assert RETRY_BACKOFF == (2, 4, 8)
 
 
 def test_genre_templates_has_all_categories():
