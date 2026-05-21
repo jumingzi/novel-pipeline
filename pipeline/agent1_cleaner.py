@@ -163,12 +163,19 @@ def chunk_chapter(
     return chunks
 
 
-def process_file(filepath: str, tokens_per_chunk: int = 8000, overlap_tokens: int = 500) -> list[Chunk]:
+def process_file(filepath: str, tokens_per_chunk: int = 8000, overlap_tokens: int = 500,
+                 start_chapter: int = 0, end_chapter: int = 0) -> list[Chunk]:
     raw = parse_file(filepath)
     cleaned = clean_text(raw)
     chapters = split_into_chapters(cleaned)
+    # Apply chapter range filter (1-indexed from user, 0 means no limit)
+    if start_chapter > 0:
+        chapters = chapters[start_chapter - 1:]
+    if end_chapter > 0:
+        chapters = chapters[:end_chapter - (start_chapter - 1) if start_chapter > 0 else end_chapter]
     all_chunks = []
     for i, ch in enumerate(chapters):
-        chunks = chunk_chapter(ch["content"], i, tokens_per_chunk, overlap_tokens, ch["title"])
+        real_idx = (start_chapter - 1 + i) if start_chapter > 0 else i
+        chunks = chunk_chapter(ch["content"], real_idx, tokens_per_chunk, overlap_tokens, ch["title"])
         all_chunks.extend(chunks)
     return all_chunks

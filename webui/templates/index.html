@@ -10,788 +10,679 @@
 
 <div class="app">
 
-  <!-- ========== HAMBURGER ========== -->
-  <button class="hamburger" id="hamburger" aria-label="Toggle sidebar">
-    <span></span>
-  </button>
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar" id="sidebar">
 
-  <!-- ========== SIDEBAR OVERLAY ========== -->
-  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="sidebar-header">
+    <h1>小说矩阵工坊<span class="stamp">墨</span></h1>
+  </div>
 
-  <!-- ========== SIDEBAR ========== -->
-  <aside class="sidebar" id="sidebar">
+  <nav class="sidebar-nav">
 
-    <!-- Project List -->
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">项目列表</div>
-      <ul class="project-list" id="projectList">
-        <li class="project-item active" data-project="doupotongren">
-          <span class="project-dot"></span> 斗破同人
-        </li>
-        <li class="project-item" data-project="fanrentongren">
-          <span class="project-dot"></span> 凡人同人
-        </li>
-        <li class="project-item" data-project="yuanchuangxianxia">
-          <span class="project-dot"></span> 原创仙侠
-        </li>
-      </ul>
-      <button class="btn-new-project" id="btnNewProject">+ 新建项目</button>
+    <!-- 拆书 Section -->
+    <div class="nav-section open" id="nav-section-deconstruct">
+      <div class="nav-section-header" data-section="deconstruct">
+        <span class="icon">📖</span> 拆书
+        <span class="arrow">▶</span>
+      </div>
+      <div class="nav-items">
+        <div class="nav-item active" data-panel="deconstruct-source">
+          <span class="dot"></span> 源文件
+        </div>
+        <div class="nav-item" data-panel="deconstruct-range">
+          <span class="dot"></span> 拆解范围
+        </div>
+        <div class="nav-item" data-panel="deconstruct-chars">
+          <span class="dot"></span> 人设分析
+        </div>
+        <div class="nav-item" data-panel="deconstruct-plot">
+          <span class="dot"></span> 剧情分析
+        </div>
+        <div class="nav-item" data-panel="deconstruct-pace">
+          <span class="dot"></span> 节奏分析
+        </div>
+      </div>
     </div>
 
-    <!-- Settings -->
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">项目设置</div>
+    <!-- 知识库 Section -->
+    <div class="nav-section open" id="nav-section-kb">
+      <div class="nav-section-header" data-section="kb">
+        <span class="icon">📚</span> 知识库
+        <span class="arrow">▶</span>
+      </div>
+      <div class="nav-items">
+        <div class="nav-item" data-panel="kb-characters">
+          <span class="dot"></span> 角色卡
+        </div>
+        <div class="nav-item" data-panel="kb-timeline">
+          <span class="dot"></span> 剧情线
+        </div>
+        <div class="nav-item" data-panel="kb-world">
+          <span class="dot"></span> 世界观
+        </div>
+        <div class="nav-item" data-panel="kb-style">
+          <span class="dot"></span> 文风档案
+        </div>
+      </div>
+    </div>
 
+    <!-- 章节生成 Section -->
+    <div class="nav-section open" id="nav-section-generate">
+      <div class="nav-section-header" data-section="generate">
+        <span class="icon">✍</span> 章节生成
+        <span class="arrow">▶</span>
+      </div>
+      <div class="nav-items">
+        <div class="nav-item" data-panel="generate-outline">
+          <span class="dot"></span> 细纲输入
+        </div>
+        <div class="nav-item" data-panel="generate-title">
+          <span class="dot"></span> 标题生成
+        </div>
+        <div class="nav-item" data-panel="generate-inspire">
+          <span class="dot"></span> 灵感建议
+        </div>
+        <div class="nav-item" data-panel="generate-writer">
+          <span class="dot"></span> AI写手对话
+        </div>
+      </div>
+    </div>
+
+  </nav>
+
+  <!-- Upload area (shared, inside 拆书>源文件 panel context) -->
+  <div class="sidebar-actions">
+    <div class="chapter-range">
+      章节 <input type="number" id="chStart" value="1" min="1" placeholder="起"> —
+      <input type="number" id="chEnd" value="0" min="0" placeholder="终">
+    </div>
+    <button class="btn btn-primary" onclick="startAnalyze()">开始拆书</button>
+  </div>
+</aside>
+
+<!-- ============ MAIN ============ -->
+<div class="main-content">
+
+  <!-- Tab Bar -->
+  <div class="tab-bar" id="tabBar">
+    <div class="tab active" data-tab="welcome" onclick="activateTab('welcome')">
+      欢迎 <span class="tab-close" onclick="event.stopPropagation();closeTab('welcome')" style="visibility:hidden">×</span>
+    </div>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content-area" id="tabContentArea">
+
+    <!-- Welcome Tab -->
+    <div class="tab-panel active welcome-panel" id="panel-welcome">
+      <div class="seal">墨</div>
+      <p>从左侧选择一个功能开始。<br>拆解小说、查阅知识库、或生成新章节。</p>
+      <div class="progress-row" style="margin-top:24px;justify-content:center;">
+        <div class="progress-dots" id="progressDots">
+          <span class="progress-dot" title="文件处理"></span>
+          <span class="progress-dot" title="拆书分析"></span>
+          <span class="progress-dot" title="知识归档"></span>
+          <span class="progress-dot" title="AI写手"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- === 拆书 Panels === -->
+    <div class="tab-panel" id="panel-deconstruct-source">
+      <h3>源文件上传</h3>
+      <div class="sidebar-upload" id="uploadZone" style="margin:16px 0;padding:32px;">
+        拖拽 .txt / .epub / .mobi 文件到此处<br>或点击选择文件
+        <div class="file-name" id="sourceFileName"></div>
+      </div>
+      <input type="file" class="file-input-hidden" id="fileInput" accept=".txt,.epub,.mobi">
+      <div style="margin-top:12px;">
+        <span style="font-size:12px;color:var(--ink-light)">对标书：</span>
+        <div class="sidebar-upload" id="refUploadZone" style="margin:8px 0;padding:16px;">
+          拖拽对标书文件
+          <div class="file-name" id="refFileNames"></div>
+        </div>
+        <input type="file" class="file-input-hidden" id="refFileInput" accept=".txt,.epub,.mobi" multiple>
+      </div>
       <div class="setting-row">
-        <label class="setting-label" for="genreSelect">题材</label>
-        <select class="setting-select" id="genreSelect">
-          <option value="玄幻" selected>玄幻</option>
-          <option value="仙侠">仙侠</option>
-          <option value="武侠">武侠</option>
-          <option value="都市">都市</option>
-          <option value="轻小说">轻小说</option>
-          <option value="历史">历史</option>
-          <option value="军事">军事</option>
-          <option value="科幻">科幻</option>
-          <option value="奇幻">奇幻</option>
-          <option value="游戏">游戏</option>
-          <option value="悬疑">悬疑</option>
-          <option value="现实">现实</option>
-          <option value="体育">体育</option>
-          <option value="短篇">短篇</option>
+        <label>题材</label>
+        <select class="genre-select" id="genreSelect">
+          <option value="">自动检测</option>
+          <option>玄幻</option><option>仙侠</option><option>武侠</option><option>都市</option>
+          <option>轻小说</option><option>历史</option><option>军事</option><option>科幻</option>
+          <option>奇幻</option><option>游戏</option><option>悬疑</option><option>现实</option>
+          <option>体育</option><option>短篇</option><option>恋爱</option>
         </select>
       </div>
+    </div>
 
-      <div class="setting-row">
-        <label class="setting-label" for="refBook">对标书</label>
-        <input class="setting-input" type="text" id="refBook" placeholder="例如: 凡人修仙传">
+    <div class="tab-panel" id="panel-deconstruct-range">
+      <h3>拆解范围</h3>
+      <p style="font-size:13px;color:var(--ink-light);margin:16px 0;">选择要拆解的章节范围，支持分批拆解。</p>
+      <div style="display:flex;gap:12px;align-items:center;margin:16px 0;">
+        <span>从第</span>
+        <input type="number" id="chStartBig" value="1" min="1" style="width:70px;padding:8px;border:1px solid var(--ink-line);border-radius:var(--radius);font-family:var(--font);text-align:center;">
+        <span>章 到第</span>
+        <input type="number" id="chEndBig" value="0" min="0" style="width:70px;padding:8px;border:1px solid var(--ink-line);border-radius:var(--radius);font-family:var(--font);text-align:center;">
+        <span>章（0=末章）</span>
       </div>
+      <button class="btn btn-primary btn-sm" onclick="syncChapterRange()">应用到拆解 →</button>
+    </div>
 
+    <div class="tab-panel" id="panel-deconstruct-chars">
+      <h3>人设分析</h3>
+      <div class="empty-state"><p>先上传源文件并点击"开始拆书"，分析结果将在此显示。</p></div>
+    </div>
+
+    <div class="tab-panel" id="panel-deconstruct-plot">
+      <h3>剧情分析</h3>
+      <div class="empty-state"><p>先上传源文件并点击"开始拆书"，分析结果将在此显示。</p></div>
+    </div>
+
+    <div class="tab-panel" id="panel-deconstruct-pace">
+      <h3>节奏分析</h3>
+      <div class="empty-state"><p>先上传源文件并点击"开始拆书"，分析结果将在此显示。</p></div>
+    </div>
+
+    <!-- === 知识库 Panels === -->
+    <div class="tab-panel" id="panel-kb-characters">
+      <h3>角色卡</h3>
+      <div class="kb-grid" id="kbCharGrid"></div>
+      <div class="empty-state" id="kbCharEmpty"><p>知识库中暂无角色数据。<br>先拆解小说，角色信息会同步到此。</p></div>
+    </div>
+
+    <div class="tab-panel" id="panel-kb-timeline">
+      <h3>剧情时间线</h3>
+      <div id="kbTimelineContent"></div>
+      <div class="empty-state" id="kbTimelineEmpty"><p>知识库中暂无剧情数据。</p></div>
+    </div>
+
+    <div class="tab-panel" id="panel-kb-world">
+      <h3>世界观设定</h3>
+      <div id="kbWorldContent"></div>
+      <div class="empty-state" id="kbWorldEmpty"><p>知识库中暂无世界观数据。</p></div>
+    </div>
+
+    <div class="tab-panel" id="panel-kb-style">
+      <h3>文风档案</h3>
+      <div id="kbStyleContent"></div>
+      <div class="empty-state" id="kbStyleEmpty"><p>知识库中暂无文风数据。</p></div>
+    </div>
+
+    <!-- === 章节生成 Panels === -->
+    <div class="tab-panel" id="panel-generate-outline">
+      <h3>细纲输入</h3>
+      <div class="setting-row" style="margin-top:12px;">
+        <label>题材</label>
+        <select class="genre-select" id="genGenreSelect">
+          <option>玄幻</option><option>仙侠</option><option>武侠</option><option>都市</option>
+          <option>轻小说</option><option>历史</option><option>军事</option><option>科幻</option>
+          <option>奇幻</option><option>游戏</option><option>悬疑</option><option>现实</option>
+          <option>体育</option><option>短篇</option><option>恋爱</option>
+        </select>
+        <label>字数</label>
+        <input type="range" min="2000" max="8000" value="3000" step="500" id="genWordCount" oninput="document.getElementById('wordCountLabel').textContent=this.value">
+        <span id="wordCountLabel" style="font-size:12px;color:var(--ink-light)">3000</span>
+      </div>
+      <textarea class="outline-input" id="outlineInput" placeholder="输入本章细纲...&#10;&#10;例如：&#10;1. 林羽踏入秘境，遭遇三阶妖兽&#10;2. 苦战后觉醒新功法&#10;3. 秘境深处发现古修士遗迹"></textarea>
+      <button class="btn btn-primary" onclick="startGenerateChapter()">生成章节</button>
+    </div>
+
+    <div class="tab-panel" id="panel-generate-title">
+      <h3>标题生成</h3>
+      <textarea class="outline-input" id="titleSynopsisInput" placeholder="输入故事概要，AI 将为你拟几个备选标题..."></textarea>
       <div class="setting-row">
-        <label class="setting-label">字数目标</label>
-        <div class="slider-row">
-          <input class="setting-slider" type="range" id="wordCountSlider" min="2000" max="8000" value="3000" step="500">
-          <span class="slider-value" id="wordCountValue">3000</span>
+        <label>题材</label>
+        <select class="genre-select" id="titleGenreSelect">
+          <option>玄幻</option><option>仙侠</option><option>武侠</option><option>都市</option>
+          <option>轻小说</option><option>历史</option><option>军事</option><option>科幻</option>
+          <option>奇幻</option><option>游戏</option><option>悬疑</option><option>现实</option>
+          <option>体育</option><option>短篇</option><option>恋爱</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="generateTitles()">生成标题</button>
+      <div id="titleResults" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="tab-panel" id="panel-generate-inspire">
+      <h3>灵感建议</h3>
+      <textarea class="outline-input" id="inspireInput" placeholder="描述你卡文的地方，AI 分析知识库给出建议...&#10;&#10;例如：&#10;主角被三位元婴期修士围杀，怎么破局？"></textarea>
+      <button class="btn btn-primary" onclick="getInspiration()">获取建议</button>
+      <div id="inspireResults" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="tab-panel" id="panel-generate-writer">
+      <div class="chat-panel">
+        <div class="chat-messages" id="chatMessages">
+          <div class="empty-state"><p>与 AI 写手对话，输入细纲或想法开始创作。</p></div>
+        </div>
+        <div class="chat-input-area">
+          <textarea id="chatInput" rows="2" placeholder="写细纲、提反馈，或输入 /灵感 /书名 ..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+          <button class="btn btn-primary" onclick="sendChat()">寄</button>
         </div>
       </div>
-
-      <div class="setting-row">
-        <div class="toggle-row">
-          <label class="setting-label" style="margin-bottom:0;">联网搜索</label>
-          <label class="toggle">
-            <input type="checkbox" id="webSearchToggle">
-            <span class="slider"></span>
-          </label>
-        </div>
-      </div>
     </div>
 
-    <!-- Source File Upload -->
-    <div class="sidebar-section">
-      <div class="sidebar-section-title">上传源文件</div>
-      <div class="drop-zone" id="dropZoneSource">
-        <span>拖拽 .txt / .epub / .mobi 到此处</span>
-        <br><span style="font-size:11px;">或点击选择文件</span>
-        <div class="drop-zone-file" id="dropZoneSourceFile"></div>
-      </div>
-      <input type="file" id="fileInputSource" accept=".txt,.epub,.mobi" style="display:none;">
+  </div><!-- /tab-content-area -->
 
-      <!-- Reference Book Upload -->
-      <div class="sidebar-section-title" style="margin-top:6px;">上传参考书</div>
-      <div class="drop-zone" id="dropZoneRef">
-        <span>拖拽对标书 .txt / .epub / .mobi 到此处</span>
-        <br><span style="font-size:11px;">或点击选择文件</span>
-        <div class="drop-zone-file" id="dropZoneRefFile"></div>
-      </div>
-      <input type="file" id="fileInputRef" accept=".txt,.epub,.mobi" style="display:none;">
+</div><!-- /main-content -->
 
-      <button class="btn-sidebar-action" id="btnAnalyze">开始拆书</button>
-      <button class="btn-sidebar-action" id="btnGenerateChapter" style="margin-top:6px;">生成章节</button>
-    </div>
+</div><!-- /app -->
 
-  </aside>
-
-  <!-- ========== MAIN AREA ========== -->
-  <main class="main">
-
-    <!-- Progress Bar -->
-    <div class="progress-bar" id="progressBar">
-      <div class="progress-dot-wrap">
-        <div class="progress-dot" id="dot1" data-agent="agent1"></div>
-        <span class="progress-label">清洗分章</span>
-      </div>
-      <div class="progress-line"></div>
-      <div class="progress-dot-wrap">
-        <div class="progress-dot" id="dot2" data-agent="agent2"></div>
-        <span class="progress-label">拆解分析</span>
-      </div>
-      <div class="progress-line"></div>
-      <div class="progress-dot-wrap">
-        <div class="progress-dot" id="dot3" data-agent="agent3"></div>
-        <span class="progress-label">知识入库</span>
-      </div>
-      <div class="progress-line"></div>
-      <div class="progress-dot-wrap">
-        <div class="progress-dot" id="dot4" data-agent="agent4"></div>
-        <span class="progress-label">章节生成</span>
-      </div>
-    </div>
-
-    <!-- Message List -->
-    <div class="message-list" id="messageList">
-      <div class="message-list-empty" id="messageListEmpty">
-        输入大纲或情节，开始创作
-      </div>
-    </div>
-
-    <!-- Input Area -->
-    <div class="input-area">
-      <div class="input-row">
-        <textarea class="input-box" id="inputBox" placeholder="输入章节大纲、情节构思，或卡文时的困惑..." rows="1"></textarea>
-        <button class="btn-send" id="btnSend">寄</button>
-      </div>
-    </div>
-
-  </main>
-
-</div>
-
-<!-- ========== KB PANEL ========== -->
-<div class="kb-panel" id="kbPanel">
-  <div class="kb-panel-header" id="kbPanelHeader">
-    <span>知识库</span>
-    <span class="arrow">&#9660;</span>
-  </div>
-  <div class="kb-panel-body">
-    <div class="kb-stat">
-      <span class="kb-stat-label">人物数量</span>
-      <span class="kb-stat-value" id="kbCharCount">0</span>
-    </div>
-    <div class="kb-stat">
-      <span class="kb-stat-label">伏笔数量</span>
-      <span class="kb-stat-value" id="kbForeshadowCount">0</span>
-    </div>
-    <div class="kb-chapter-list" id="kbChapterList">
-      <div style="color:var(--ink-light);font-size:11px;">暂无已采纳章节</div>
-    </div>
-  </div>
-</div>
-
-<!-- KB Toggle Button -->
-<button class="kb-toggle" id="kbToggle" aria-label="Toggle knowledge base">&#9679;</button>
-
-<!-- ========== INSPIRATION MODAL ========== -->
-<div class="modal-backdrop" id="inspirationModal">
-  <div class="modal">
-    <div class="modal-title">灵感启发</div>
-    <div class="modal-body" id="inspirationBody"></div>
-    <button class="modal-close" id="inspirationClose">关闭</button>
-  </div>
-</div>
-
-<!-- ========== TOAST ========== -->
-<div class="toast" id="toast"></div>
-
-<!-- ==========================================================
-     SCRIPTS
-     ========================================================== -->
 <script>
-(function() {
-  'use strict';
+// ============ APP STATE ============
+let sourceFilePath = '';
+let sourceFileName = '';
+let refFilePaths = [];
+let refFileNames = [];
+let savedChapters = [];
+let chatHistory = [];
+let analysisResult = null;
 
-  /* ---- DOM Refs ---- */
-  const $ = (s) => document.querySelector(s);
-  const $$ = (s) => document.querySelectorAll(s);
+// ============ TAB SYSTEM ============
+const openTabs = new Map();
+openTabs.set('welcome', true);
 
-  const sidebar         = $('#sidebar');
-  const hamburger       = $('#hamburger');
-  const sidebarOverlay  = $('#sidebarOverlay');
-  const messageList     = $('#messageList');
-  const messageListEmpty= $('#messageListEmpty');
-  const inputBox        = $('#inputBox');
-  const btnSend         = $('#btnSend');
-  const btnAnalyze      = $('#btnAnalyze');
-  const btnGenerateCh   = $('#btnGenerateChapter');
-  const kbPanel         = $('#kbPanel');
-  const kbToggle        = $('#kbToggle');
-  const kbPanelHeader   = $('#kbPanelHeader');
-  const kbCharCount     = $('#kbCharCount');
-  const kbForeshadowCount = $('#kbForeshadowCount');
-  const kbChapterList   = $('#kbChapterList');
-  const inspirationModal= $('#inspirationModal');
-  const inspirationBody = $('#inspirationBody');
-  const inspirationClose= $('#inspirationClose');
-  const toast           = $('#toast');
-  const genreSelect     = $('#genreSelect');
-  const wordCountSlider = $('#wordCountSlider');
-  const wordCountValue  = $('#wordCountValue');
-  const webSearchToggle = $('#webSearchToggle');
-  const dropZoneSource  = $('#dropZoneSource');
-  const dropZoneRef     = $('#dropZoneRef');
-  const fileInputSource = $('#fileInputSource');
-  const fileInputRef    = $('#fileInputRef');
-  const dropZoneSourceFile = $('#dropZoneSourceFile');
-  const dropZoneRefFile = $('#dropZoneRefFile');
-
-  /* ---- State ---- */
-  let currentProject = 'doupotongren';
-  let uploadedFilePath = '';
-  let uploadedRefPaths = [];
-  let savedChapters = [];
-  let eventSource = null;
-
-  /* ---- Helpers ---- */
-  function showToast(msg, duration) {
-    duration = duration || 2000;
-    clearTimeout(showToast._timer);
-    toast.textContent = msg;
-    toast.classList.add('show');
-    showToast._timer = setTimeout(function() {
-      toast.classList.remove('show');
-    }, duration);
+function activateTab(tabId) {
+  // Add tab if not open
+  if (!openTabs.has(tabId) && tabId !== 'welcome') {
+    const panel = document.getElementById('panel-' + tabId);
+    const title = panel ? panel.querySelector('h3')?.textContent || tabId : tabId;
+    openTabs.set(tabId, true);
+    renderTabs();
   }
 
-  function escapeHtml(str) {
-    var div = document.createElement('div');
-    div.appendChild(document.createTextNode(str));
-    return div.innerHTML;
-  }
+  // Deactivate all
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
 
-  /* ---- Sidebar Toggle ---- */
-  function openSidebar() {
-    sidebar.classList.remove('collapsed');
-    sidebarOverlay.classList.add('active');
-  }
+  // Activate target
+  const tab = document.querySelector(`.tab[data-tab="${tabId}"]`);
+  if (tab) tab.classList.add('active');
+  const panel = document.getElementById('panel-' + tabId);
+  if (panel) panel.classList.add('active');
 
-  function closeSidebar() {
-    sidebar.classList.add('collapsed');
-    sidebarOverlay.classList.remove('active');
-  }
+  // Highlight sidebar nav item
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navItem = document.querySelector(`[data-panel="${tabId}"]`);
+  if (navItem) navItem.classList.add('active');
+}
 
-  hamburger.addEventListener('click', function() {
-    if (sidebar.classList.contains('collapsed')) {
-      openSidebar();
-    } else {
-      closeSidebar();
-    }
+function closeTab(tabId) {
+  if (tabId === 'welcome') return;
+  openTabs.delete(tabId);
+  renderTabs();
+  // Switch to welcome if closed tab was active
+  const activeTab = document.querySelector('.tab.active');
+  if (activeTab && activeTab.dataset.tab === tabId) {
+    activateTab('welcome');
+  }
+}
+
+function renderTabs() {
+  const bar = document.getElementById('tabBar');
+  let html = '';
+
+  // Welcome tab always first
+  html += `<div class="tab${getActiveTabId() === 'welcome' ? ' active' : ''}" data-tab="welcome" onclick="activateTab('welcome')">
+    欢迎 <span class="tab-close" onclick="event.stopPropagation();closeTab('welcome')" style="visibility:hidden">×</span>
+  </div>`;
+
+  for (const [tid, _] of openTabs) {
+    if (tid === 'welcome') continue;
+    const panel = document.getElementById('panel-' + tid);
+    const title = panel ? panel.querySelector('h3')?.textContent || tid : tid;
+    const active = getActiveTabId() === tid ? ' active' : '';
+    html += `<div class="tab${active}" data-tab="${tid}" onclick="activateTab('${tid}')">
+      ${title} <span class="tab-close" onclick="event.stopPropagation();closeTab('${tid}')">×</span>
+    </div>`;
+  }
+  bar.innerHTML = html;
+}
+
+function getActiveTabId() {
+  const active = document.querySelector('.tab.active');
+  return active ? active.dataset.tab : 'welcome';
+}
+
+function openPanel(panelId) {
+  if (!openTabs.has(panelId)) {
+    openTabs.set(panelId, true);
+    renderTabs();
+  }
+  activateTab(panelId);
+}
+
+// ============ SIDEBAR NAVIGATION ============
+document.querySelectorAll('.nav-section-header').forEach(header => {
+  header.addEventListener('click', () => {
+    const section = header.parentElement;
+    section.classList.toggle('open');
   });
+});
 
-  sidebarOverlay.addEventListener('click', closeSidebar);
-
-  /* ---- Project Selection ---- */
-  $('#projectList').addEventListener('click', function(e) {
-    var item = e.target.closest('.project-item');
-    if (!item) return;
-    $$('.project-item').forEach(function(el) { el.classList.remove('active'); });
-    item.classList.add('active');
-    currentProject = item.dataset.project;
-    closeSidebar();
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const panelId = item.dataset.panel;
+    openPanel(panelId);
   });
+});
 
-  /* ---- New Project ---- */
-  $('#btnNewProject').addEventListener('click', function() {
-    var name = prompt('请输入新项目名称：');
-    if (!name) return;
-    var li = document.createElement('li');
-    li.className = 'project-item';
-    li.dataset.project = 'proj_' + Date.now();
-    li.innerHTML = '<span class="project-dot"></span> ' + escapeHtml(name);
-    $('#projectList').appendChild(li);
-    li.addEventListener('click', function(e) {
-      $$('.project-item').forEach(function(el) { el.classList.remove('active'); });
-      li.classList.add('active');
-      currentProject = li.dataset.project;
+// ============ FILE UPLOAD ============
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const refUploadZone = document.getElementById('refUploadZone');
+const refFileInput = document.getElementById('refFileInput');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) uploadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) uploadFile(fileInput.files[0]); });
+
+refUploadZone.addEventListener('click', () => refFileInput.click());
+refUploadZone.addEventListener('dragover', e => { e.preventDefault(); refUploadZone.classList.add('dragover'); });
+refUploadZone.addEventListener('dragleave', () => refUploadZone.classList.remove('dragover'));
+refUploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  refUploadZone.classList.remove('dragover');
+  Array.from(e.dataTransfer.files).forEach(uploadRefFile);
+});
+refFileInput.addEventListener('change', () => { Array.from(refFileInput.files).forEach(uploadRefFile); });
+
+async function uploadFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    sourceFilePath = data.path;
+    sourceFileName = data.filename;
+    document.getElementById('sourceFileName').textContent = '已选择: ' + data.filename;
+    toast('源文件上传成功');
+  } catch(e) { toast('上传失败: ' + e.message); }
+}
+
+async function uploadRefFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await fetch('/api/upload-reference', { method: 'POST', body: fd });
+    const data = await res.json();
+    refFilePaths.push(data.path);
+    refFileNames.push(data.filename);
+    document.getElementById('refFileNames').textContent = '已选择: ' + refFileNames.join(', ');
+    toast('对标书上传成功');
+  } catch(e) { toast('上传失败: ' + e.message); }
+}
+
+// ============ CHAPTER RANGE ============
+function syncChapterRange() {
+  document.getElementById('chStart').value = document.getElementById('chStartBig').value;
+  document.getElementById('chEnd').value = document.getElementById('chEndBig').value;
+  toast('拆解范围已应用');
+  openPanel('deconstruct-source');
+}
+
+// Sync sidebar inputs to main inputs
+document.getElementById('chStart').addEventListener('change', function() {
+  document.getElementById('chStartBig').value = this.value;
+});
+document.getElementById('chEnd').addEventListener('change', function() {
+  document.getElementById('chEndBig').value = this.value;
+});
+
+// ============ ANALYZE ============
+async function startAnalyze() {
+  if (!sourceFilePath) { toast('请先上传源文件'); return; }
+
+  const fd = new FormData();
+  fd.append('file_path', sourceFilePath);
+  fd.append('genre', document.getElementById('genreSelect').value);
+  fd.append('reference_paths', JSON.stringify(refFilePaths));
+  fd.append('start_chapter', document.getElementById('chStart').value || '0');
+  fd.append('end_chapter', document.getElementById('chEnd').value || '0');
+
+  try {
+    const res = await fetch('/api/analyze', { method: 'POST', body: fd });
+    await res.json();
+    toast('拆书已启动，请查看进度');
+    openPanel('deconstruct-chars');
+
+    // Show loading state
+    ['deconstruct-chars','deconstruct-plot','deconstruct-pace'].forEach(id => {
+      const panel = document.getElementById('panel-' + id);
+      if (panel) {
+        const empty = panel.querySelector('.empty-state');
+        if (empty) empty.innerHTML = '<div class="spinner"></div><p>分析中...</p>';
+      }
     });
-  });
+  } catch(e) { toast('启动失败: ' + e.message); }
+}
 
-  /* ---- Word Count Slider ---- */
-  wordCountSlider.addEventListener('input', function() {
-    wordCountValue.textContent = this.value;
-  });
+// ============ CHAPTER GENERATION ============
+async function startGenerateChapter() {
+  const outline = document.getElementById('outlineInput').value.trim();
+  if (!outline) { toast('请输入章节细纲'); return; }
 
-  /* ---- File Upload: Source ---- */
-  dropZoneSource.addEventListener('click', function() { fileInputSource.click(); });
-  dropZoneSource.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('dragover'); });
-  dropZoneSource.addEventListener('dragleave', function() { this.classList.remove('dragover'); });
-  dropZoneSource.addEventListener('drop', function(e) {
-    e.preventDefault();
-    this.classList.remove('dragover');
-    var file = e.dataTransfer.files[0];
-    if (file) uploadFile(file, 'source');
-  });
-  fileInputSource.addEventListener('change', function() {
-    if (this.files[0]) uploadFile(this.files[0], 'source');
-  });
+  const fd = new FormData();
+  fd.append('outline', outline);
+  fd.append('genre', document.getElementById('genGenreSelect').value);
+  fd.append('word_count', document.getElementById('genWordCount').value);
+  fd.append('reference_style', analysisResult?.reference_style || '');
 
-  /* ---- File Upload: Reference ---- */
-  dropZoneRef.addEventListener('click', function() { fileInputRef.click(); });
-  dropZoneRef.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('dragover'); });
-  dropZoneRef.addEventListener('dragleave', function() { this.classList.remove('dragover'); });
-  dropZoneRef.addEventListener('drop', function(e) {
-    e.preventDefault();
-    this.classList.remove('dragover');
-    var file = e.dataTransfer.files[0];
-    if (file) uploadFile(file, 'ref');
-  });
-  fileInputRef.addEventListener('change', function() {
-    if (this.files[0]) uploadFile(this.files[0], 'ref');
-  });
+  try {
+    const res = await fetch('/api/generate-chapter', { method: 'POST', body: fd });
+    await res.json();
+    toast('章节生成已启动');
+    openPanel('generate-writer');
+  } catch(e) { toast('生成失败: ' + e.message); }
+}
 
-  function uploadFile(file, type) {
-    var formData = new FormData();
-    formData.append('file', file);
-    var endpoint = type === 'source' ? '/api/upload' : '/api/upload-reference';
+// ============ TITLES ============
+async function generateTitles() {
+  const synopsis = document.getElementById('titleSynopsisInput').value.trim();
+  if (!synopsis) { toast('请输入故事概要'); return; }
 
-    fetch(endpoint, { method: 'POST', body: formData })
-      .then(function(r) {
-        if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        return r.json();
-      })
-      .then(function(data) {
-        if (type === 'source') {
-          uploadedFilePath = data.path;
-          dropZoneSourceFile.textContent = data.filename + ' (' + formatSize(data.size) + ')';
-          dropZoneSourceFile.style.display = 'block';
-          showToast('源文件上传成功: ' + data.filename);
-        } else {
-          uploadedRefPaths.push(data.path);
-          dropZoneRefFile.textContent = data.filename + ' (' + formatSize(data.size) + ')';
-          dropZoneRefFile.style.display = 'block';
-          showToast('参考书上传成功: ' + data.filename);
+  const fd = new FormData();
+  fd.append('synopsis', synopsis);
+  fd.append('genre', document.getElementById('titleGenreSelect').value);
+
+  try {
+    const res = await fetch('/api/titles', { method: 'POST', body: fd });
+    const data = await res.json();
+    document.getElementById('titleResults').innerHTML = `<div class="message ai"><div class="msg-content">${escapeHtml(data.titles || '无结果')}</div></div>`;
+  } catch(e) { toast('生成失败: ' + e.message); }
+}
+
+// ============ INSPIRATION ============
+async function getInspiration() {
+  const stuck = document.getElementById('inspireInput').value.trim();
+  if (!stuck) { toast('请描述卡文的地方'); return; }
+
+  const fd = new FormData();
+  fd.append('stuck_point', stuck);
+
+  try {
+    const res = await fetch('/api/inspiration', { method: 'POST', body: fd });
+    const data = await res.json();
+    document.getElementById('inspireResults').innerHTML = `<div class="message ai"><div class="msg-content">${escapeHtml(data.suggestion || '无结果')}</div></div>`;
+  } catch(e) { toast('获取失败: ' + e.message); }
+}
+
+// ============ CHAT ============
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // Add user message
+  const msgs = document.getElementById('chatMessages');
+  const empty = msgs.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  msgs.innerHTML += `<div class="message user"><div class="msg-content">${escapeHtml(text)}</div></div>`;
+  chatHistory.push({ role: 'user', content: text });
+  input.value = '';
+  msgs.scrollTop = msgs.scrollHeight;
+
+  let response = '';
+
+  // Handle slash commands
+  if (text.startsWith('/灵感')) {
+    const fd = new FormData();
+    fd.append('stuck_point', text.replace('/灵感','').trim() || '卡文了');
+    try {
+      const res = await fetch('/api/inspiration', { method: 'POST', body: fd });
+      const data = await res.json();
+      response = data.suggestion || '暂时没有建议。';
+    } catch(e) { response = '获取建议失败：' + e.message; }
+  } else if (text.startsWith('/书名')) {
+    const fd = new FormData();
+    fd.append('synopsis', text.replace('/书名','').trim() || '无概要');
+    fd.append('genre', document.getElementById('genGenreSelect').value);
+    try {
+      const res = await fetch('/api/titles', { method: 'POST', body: fd });
+      const data = await res.json();
+      response = data.titles || '暂时没有标题建议。';
+    } catch(e) { response = '生成标题失败：' + e.message; }
+  } else {
+    // Treat as chapter outline — trigger chapter generation
+    const fd = new FormData();
+    fd.append('outline', text);
+    fd.append('genre', document.getElementById('genGenreSelect').value);
+    fd.append('word_count', document.getElementById('genWordCount').value);
+    try {
+      const res = await fetch('/api/generate-chapter', { method: 'POST', body: fd });
+      await res.json();
+      response = '章节生成已启动，请稍候查看结果...';
+    } catch(e) { response = '生成失败：' + e.message; }
+  }
+
+  msgs.innerHTML += `<div class="message ai">
+    <div class="msg-content">${escapeHtml(response)}</div>
+    <div class="msg-actions">
+      <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
+      <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
+      <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
+    </div>
+  </div>`;
+  chatHistory.push({ role: 'assistant', content: response });
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function adoptChapter(btn) {
+  const content = btn.parentElement.previousElementSibling.textContent;
+  const chNum = savedChapters.length + 1;
+  savedChapters.push({ chapter: chNum, content, time: new Date().toLocaleTimeString() });
+  refreshKBPanel();
+  toast(`第${chNum}章已保存到知识库`);
+}
+
+// ============ SSE PROGRESS ============
+const evtSource = new EventSource('/api/events');
+evtSource.onmessage = function(event) {
+  try {
+    const data = JSON.parse(event.data);
+    updateProgress(data.agent_id, data.status);
+  } catch(e) {}
+};
+
+function updateProgress(agentId, status) {
+  const dots = document.querySelectorAll('#progressDots .progress-dot');
+  const agentMap = { agent1: 0, agent2: 1, agent3: 2, agent4: 3 };
+  const idx = agentMap[agentId];
+  if (idx === undefined) return;
+  dots.forEach(d => { d.classList.remove('running'); });
+  if (status === 'running') {
+    dots[idx].classList.add('running');
+  } else if (status === 'done') {
+    dots[idx].classList.add('done');
+    dots[idx].classList.remove('running');
+    // If agent3 done, refresh KB panels
+    if (agentId === 'agent3') {
+      refreshAllKBPanels();
+      ['deconstruct-chars','deconstruct-plot','deconstruct-pace'].forEach(id => {
+        const panel = document.getElementById('panel-' + id);
+        if (panel) {
+          const empty = panel.querySelector('.empty-state');
+          if (empty) empty.innerHTML = '<p>分析结果已产出，正在加载...</p>';
         }
-      })
-      .catch(function(err) {
-        showToast('上传失败: ' + err.message, 3000);
       });
-  }
-
-  function formatSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(1) + ' MB';
-  }
-
-  /* ---- Progress Dots ---- */
-  function updateProgressDot(agentId, status) {
-    var map = { agent1: 'dot1', agent2: 'dot2', agent3: 'dot3', agent4: 'dot4' };
-    var dot = $('#' + map[agentId]);
-    if (!dot) return;
-    dot.classList.remove('done', 'running', 'error');
-    if (status === 'done') dot.classList.add('done');
-    else if (status === 'running') dot.classList.add('running');
-  }
-
-  function resetAllDots() {
-    ['dot1','dot2','dot3','dot4'].forEach(function(id) {
-      var dot = $('#' + id);
-      if (dot) dot.classList.remove('done', 'running', 'error');
-    });
-  }
-
-  /* ---- Messages ---- */
-  function addMessage(role, text) {
-    messageListEmpty.style.display = 'none';
-    var msg = document.createElement('div');
-    msg.className = 'message message-' + role;
-
-    var meta = document.createElement('div');
-    meta.className = 'bubble-meta';
-    meta.innerHTML = '<span class="bubble-meta-icon">' + (role === 'ai' ? '&#x6C34;' : '&#x2318;') + '</span> ' +
-                     (role === 'ai' ? 'AI写手' : '你');
-
-    var bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.textContent = text;
-
-    msg.appendChild(meta);
-    msg.appendChild(bubble);
-
-    if (role === 'ai' && text.trim()) {
-      var actions = document.createElement('div');
-      actions.className = 'bubble-actions';
-
-      var btnAccept = document.createElement('button');
-      btnAccept.className = 'btn-action';
-      btnAccept.textContent = '采纳';
-      btnAccept.addEventListener('click', function() {
-        savedChapters.push({ text: text, time: new Date().toLocaleString() });
-        renderKBChapters();
-        btnAccept.classList.add('accepted');
-        btnAccept.textContent = '已采纳';
-        showToast('章节已保存至知识库');
-      });
-
-      var btnTweak = document.createElement('button');
-      btnTweak.className = 'btn-action';
-      btnTweak.textContent = '微调';
-      btnTweak.addEventListener('click', function() {
-        inputBox.value = '请微调以下内容，保持风格一致：\n\n' + text.substring(0, 200) + '...';
-        inputBox.focus();
-        showToast('微调指令已填入输入框');
-      });
-
-      var btnRewrite = document.createElement('button');
-      btnRewrite.className = 'btn-action';
-      btnRewrite.textContent = '重写';
-      btnRewrite.addEventListener('click', function() {
-        generateChapter(inputBox.value || text.substring(0, 100) + '...');
-      });
-
-      actions.appendChild(btnAccept);
-      actions.appendChild(btnTweak);
-      actions.appendChild(btnRewrite);
-      msg.appendChild(actions);
     }
-
-    messageList.appendChild(msg);
-    messageList.scrollTop = messageList.scrollHeight;
-    return msg;
-  }
-
-  function addTypingIndicator() {
-    messageListEmpty.style.display = 'none';
-    var indicator = document.createElement('div');
-    indicator.className = 'typing-indicator';
-    indicator.innerHTML = '<span></span><span></span><span></span>';
-    indicator.id = 'typingIndicator';
-    messageList.appendChild(indicator);
-    messageList.scrollTop = messageList.scrollHeight;
-  }
-
-  function removeTypingIndicator() {
-    var el = $('#typingIndicator');
-    if (el) el.remove();
-  }
-
-  /* ---- KB Panel ---- */
-  function renderKBChapters() {
-    kbChapterList.innerHTML = '';
-    if (savedChapters.length === 0) {
-      kbChapterList.innerHTML = '<div style="color:var(--ink-light);font-size:11px;">暂无已采纳章节</div>';
-      return;
+    // If agent4 done, show chapter in writer chat
+    if (agentId === 'agent4') {
+      fetchState();
     }
-    savedChapters.forEach(function(ch, i) {
-      var div = document.createElement('div');
-      div.className = 'kb-chapter-item';
-      div.textContent = '章节 ' + (i + 1) + ' (' + ch.time + ')';
-      div.addEventListener('click', function() {
-        addMessage('ai', ch.text);
-      });
-      kbChapterList.appendChild(div);
-    });
   }
+}
 
-  function toggleKBPanel() {
-    kbPanel.classList.toggle('collapsed');
-  }
-
-  kbToggle.addEventListener('click', toggleKBPanel);
-  kbPanelHeader.addEventListener('click', toggleKBPanel);
-
-  /* ---- Inspiration Modal ---- */
-  function showInspiration(text) {
-    inspirationBody.textContent = text;
-    inspirationModal.classList.add('active');
-  }
-
-  inspirationClose.addEventListener('click', function() {
-    inspirationModal.classList.remove('active');
-  });
-
-  inspirationModal.addEventListener('click', function(e) {
-    if (e.target === inspirationModal) inspirationModal.classList.remove('active');
-  });
-
-  /* ---- API Calls ---- */
-  function postForm(url, data) {
-    var formData = new FormData();
-    for (var key in data) {
-      if (data.hasOwnProperty(key)) {
-        formData.append(key, data[key]);
+// ============ STATE POLLING ============
+async function fetchState() {
+  try {
+    const res = await fetch('/api/state');
+    const data = await res.json();
+    if (data.result) {
+      analysisResult = data.result;
+    }
+    if (data.result?.last_chapter) {
+      const msgs = document.getElementById('chatMessages');
+      const empty = msgs.querySelector('.empty-state');
+      if (empty) empty.remove();
+      if (!chatHistory.some(m => m.role === 'assistant' && m.content === data.result.last_chapter)) {
+        msgs.innerHTML += `<div class="message ai">
+          <div class="msg-content">${escapeHtml(data.result.last_chapter)}</div>
+          <div class="msg-actions">
+            <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
+            <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
+            <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
+          </div>
+        </div>`;
+        msgs.scrollTop = msgs.scrollHeight;
       }
     }
-    return fetch(url, { method: 'POST', body: formData });
-  }
+  } catch(e) {}
+}
 
-  function startAnalysis() {
-    if (!uploadedFilePath) {
-      showToast('请先上传源文件', 3000);
-      return;
-    }
-    var genre = genreSelect.value;
-    var refPathStr = uploadedRefPaths.length > 0 ? JSON.stringify(uploadedRefPaths) : '';
-    btnAnalyze.disabled = true;
-    btnAnalyze.textContent = '分析中...';
-    resetAllDots();
+setInterval(fetchState, 3000);
 
-    postForm('/api/analyze', {
-      file_path: uploadedFilePath,
-      genre: genre,
-      reference_paths: refPathStr
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        showToast('分析已启动');
-      })
-      .catch(function(err) {
-        showToast('启动分析失败: ' + err.message, 3000);
-        btnAnalyze.disabled = false;
-        btnAnalyze.textContent = '开始拆书';
-      });
-  }
+async function refreshAllKBPanels() {
+  try {
+    const res = await fetch('/api/state');
+    const data = await res.json();
+    const kb = data.knowledge_base || {};
+    document.getElementById('kbCharEmpty').innerHTML = kb.character_count ? '' : '<p>暂无角色数据</p>';
+    document.getElementById('kbTimelineEmpty').innerHTML = kb.foreshadowing_count ? '' : '<p>暂无剧情数据</p>';
+  } catch(e) {}
+}
 
-  function generateChapter(outline) {
-    if (!outline || !outline.trim()) {
-      showToast('请输入章节大纲或情节', 3000);
-      return;
-    }
-    var genre = genreSelect.value;
-    var wordCount = parseInt(wordCountSlider.value, 10);
-    var refStyle = $('#refBook').value.trim();
+function refreshKBPanel() {
+  if (savedChapters.length === 0) return;
+  const list = savedChapters.map(c => `<div class="chapter-list-item">第${c.chapter}章 — ${c.time}</div>`).join('');
+  // Show in a KB panel if KB panels had a chapter list area
+}
 
-    addTypingIndicator();
-    btnGenerateCh.disabled = true;
+// ============ UTILS ============
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
 
-    postForm('/api/generate-chapter', {
-      outline: outline.trim(),
-      genre: genre,
-      word_count: wordCount,
-      reference_style: refStyle
-    })
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        removeTypingIndicator();
-        btnGenerateCh.disabled = false;
-        showToast('章节生成已启动，请等待进度更新');
-      })
-      .catch(function(err) {
-        removeTypingIndicator();
-        btnGenerateCh.disabled = false;
-        showToast('生成失败: ' + err.message, 3000);
-      });
-  }
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
 
-  function handleSend() {
-    var text = inputBox.value.trim();
-    if (!text) return;
-
-    // Detect inspiration request
-    if (text.startsWith('/灵感') || text.includes('卡文') || text.includes('没思路') || text.includes('写不下去')) {
-      addMessage('user', text);
-      inputBox.value = '';
-      addTypingIndicator();
-      postForm('/api/inspiration', { stuck_point: text })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          removeTypingIndicator();
-          if (data.suggestion) {
-            showInspiration(data.suggestion);
-          }
-        })
-        .catch(function(err) {
-          removeTypingIndicator();
-          showToast('获取灵感失败: ' + err.message, 3000);
-        });
-      return;
-    }
-
-    // Title generation
-    if (text.startsWith('/书名') || text.startsWith('/标题')) {
-      var synopsis = text.replace(/^\/[书标][名题]/, '').trim();
-      if (!synopsis) {
-        showToast('请提供故事简介，例如: /书名 一个少年在修真界崛起的故事', 3000);
-        return;
-      }
-      addMessage('user', text);
-      inputBox.value = '';
-      addTypingIndicator();
-      postForm('/api/titles', { synopsis: synopsis, genre: genreSelect.value })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-          removeTypingIndicator();
-          if (data.titles) {
-            addMessage('ai', data.titles);
-          }
-        })
-        .catch(function(err) {
-          removeTypingIndicator();
-          showToast('生成标题失败: ' + err.message, 3000);
-        });
-      return;
-    }
-
-    // Regular chapter generation
-    addMessage('user', text);
-    inputBox.value = '';
-    inputBox.style.height = 'auto';
-    generateChapter(text);
-  }
-
-  btnSend.addEventListener('click', handleSend);
-
-  inputBox.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  });
-
-  // Auto-resize textarea
-  inputBox.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-  });
-
-  /* ---- Analysis & Generate Buttons ---- */
-  btnAnalyze.addEventListener('click', startAnalysis);
-
-  btnGenerateCh.addEventListener('click', function() {
-    var outline = inputBox.value.trim();
-    if (!outline) {
-      outline = prompt('请输入章节大纲：');
-      if (!outline) return;
-    }
-    generateChapter(outline);
-  });
-
-  /* ---- SSE: Real-time Progress ---- */
-  function connectSSE() {
-    if (eventSource) {
-      eventSource.close();
-    }
-    eventSource = new EventSource('/api/events');
-    eventSource.onmessage = function(e) {
-      try {
-        var event = JSON.parse(e.data);
-        if (event.agent_id && event.status) {
-          updateProgressDot(event.agent_id, event.status);
-
-          if (event.agent_id === 'agent1' && event.status === 'running') {
-            showToast('正在清洗分章...');
-          } else if (event.agent_id === 'agent2' && event.status === 'running') {
-            showToast('正在拆解分析...');
-          } else if (event.agent_id === 'agent3' && event.status === 'running') {
-            showToast('正在构建知识库...');
-          } else if (event.agent_id === 'agent4' && event.status === 'done') {
-            showToast('章节生成完成!');
-            btnAnalyze.disabled = false;
-            btnAnalyze.textContent = '开始拆书';
-            // Fetch state to get the chapter content
-            fetchState();
-          } else if (event.agent_id === 'agent3' && event.status === 'done') {
-            btnAnalyze.disabled = false;
-            btnAnalyze.textContent = '开始拆书';
-            showToast('拆书分析完成!');
-            fetchState();
-          }
-        }
-        if (event.error) {
-          showToast('错误: ' + event.error, 4000);
-          btnAnalyze.disabled = false;
-          btnAnalyze.textContent = '开始拆书';
-          btnGenerateCh.disabled = false;
-        }
-      } catch (err) {
-        // ignore parse errors
-      }
-    };
-    eventSource.onerror = function() {
-      // SSE will auto-reconnect
-    };
-  }
-
-  /* ---- State Polling ---- */
-  function fetchState() {
-    fetch('/api/state')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        // Update KB stats
-        if (data.knowledge_base) {
-          kbCharCount.textContent = data.knowledge_base.character_count || 0;
-          kbForeshadowCount.textContent = data.knowledge_base.foreshadowing_count || 0;
-        }
-
-        // Update progress dots from state
-        if (data.current_step) {
-          var steps = ['agent1', 'agent2', 'agent3', 'agent4'];
-          var stepIdx = steps.indexOf(data.current_step);
-          for (var i = 0; i < steps.length; i++) {
-            var dot = $('#dot' + (i + 1));
-            if (!dot) continue;
-            dot.classList.remove('done', 'running', 'error');
-            if (i < stepIdx) dot.classList.add('done');
-            else if (i === stepIdx && data.current_step === steps[i]) dot.classList.add('running');
-          }
-        }
-
-        // Show last chapter if available
-        if (data.result && data.result.last_chapter) {
-          addMessage('ai', data.result.last_chapter);
-          // Clear it from state client-side so we don't show it again
-          // (server may still hold it; we just track what we've seen)
-        }
-
-        if (data.result && data.result.chunks && !data._notified_analysis) {
-          addMessage('ai', '拆书分析完成。共处理 ' + data.result.chunks.length + ' 个分章。\n角色数量: ' +
-            (data.knowledge_base ? data.knowledge_base.character_count : 'N/A') +
-            '\n\n现在可以输入章节大纲开始创作。');
-          data._notified_analysis = true;
-        }
-
-        if (data.is_error && data.error) {
-          showToast('错误: ' + data.error, 4000);
-        }
-      })
-      .catch(function() {
-        // silent
-      });
-  }
-
-  // Track what we've already notified about
-  var lastChapterNotified = '';
-
-  function pollStateLoop() {
-    fetch('/api/state')
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        kbCharCount.textContent = data.knowledge_base ? data.knowledge_base.character_count || 0 : 0;
-        kbForeshadowCount.textContent = data.knowledge_base ? data.knowledge_base.foreshadowing_count || 0 : 0;
-
-        // Check for new chapter
-        if (data.result && data.result.last_chapter && data.result.last_chapter !== lastChapterNotified) {
-          lastChapterNotified = data.result.last_chapter;
-          removeTypingIndicator();
-          addMessage('ai', data.result.last_chapter);
-          btnGenerateCh.disabled = false;
-        }
-
-        if (data.is_error && data.error) {
-          removeTypingIndicator();
-          btnAnalyze.disabled = false;
-          btnAnalyze.textContent = '开始拆书';
-          btnGenerateCh.disabled = false;
-        }
-      })
-      .catch(function() {});
-  }
-
-  /* ---- Initialize ---- */
-  function init() {
-    connectSSE();
-    setInterval(pollStateLoop, 2000);
-
-    // Auto-hide empty state when messages exist
-    // (handled in addMessage)
-
-    // Close sidebar on mobile by default
-    if (window.innerWidth <= 768) {
-      closeSidebar();
-    }
-  }
-
-  init();
-
-})();
+// ============ INIT ============
+renderTabs();
 </script>
+
 </body>
 </html>

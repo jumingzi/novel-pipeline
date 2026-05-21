@@ -68,10 +68,12 @@ async def start_analysis(
     file_path: str = Form(...),
     genre: str = Form(""),
     reference_paths: str = Form(""),
+    start_chapter: int = Form(0),
+    end_chapter: int = Form(0),
 ):
     orch = get_orchestrator()
     refs = json.loads(reference_paths) if reference_paths else None
-    orch.start_analysis_background(file_path, genre, refs)
+    orch.start_analysis_background(file_path, genre, refs, start_chapter, end_chapter)
     return JSONResponse({"status": "started"})
 
 

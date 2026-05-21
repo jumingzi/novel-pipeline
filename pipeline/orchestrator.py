@@ -64,10 +64,11 @@ class PipelineOrchestrator:
         self.state.advance(event["agent_id"], event["status"])
         await self.bus.emit({**event, "progress": self.state.progress})
 
-    async def run_analysis(self, filepath: str, genre: str = "", reference_files: list[str] = None) -> dict:
+    async def run_analysis(self, filepath: str, genre: str = "", reference_files: list[str] = None,
+                             start_chapter: int = 0, end_chapter: int = 0) -> dict:
         try:
             self.state.advance("agent1", "running")
-            chunks = process_file(filepath)
+            chunks = process_file(filepath, start_chapter=start_chapter, end_chapter=end_chapter)
             self.state.advance("agent1", "done")
 
             self.state.advance("agent2", "running")
@@ -121,9 +122,10 @@ class PipelineOrchestrator:
         results = self.rag.query_plot_events(query, top_k=5)
         return [f"参考剧情: {r['description']}" for r in results]
 
-    def start_analysis_background(self, filepath: str, genre: str = "", reference_files: list[str] = None):
+    def start_analysis_background(self, filepath: str, genre: str = "", reference_files: list[str] = None,
+                                    start_chapter: int = 0, end_chapter: int = 0):
         self._thread = threading.Thread(
-            target=lambda: asyncio.run(self.run_analysis(filepath, genre, reference_files)),
+            target=lambda: asyncio.run(self.run_analysis(filepath, genre, reference_files, start_chapter, end_chapter)),
             daemon=True)
         self._thread.start()
 
