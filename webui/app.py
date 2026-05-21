@@ -1,9 +1,15 @@
 import json
 import os
 import uuid
+import warnings
 from pathlib import Path
 
 import logging
+
+# Suppress noisy library warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="ebooklib")
+warnings.filterwarnings("ignore", category=FutureWarning, module="ebooklib")
+warnings.filterwarnings("ignore", message=".*Skipping data.*")
 
 # Suppress ChromaDB telemetry noise (library bug with posthog)
 logging.getLogger("chromadb").setLevel(logging.ERROR)

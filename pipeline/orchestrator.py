@@ -72,7 +72,7 @@ class PipelineOrchestrator:
             self.state.advance("agent1", "done")
 
             self.state.advance("agent2", "running")
-            decon_results = await deconstruct_all_chunks(self.client, chunks)
+            decon_results = await deconstruct_all_chunks(self.client, chunks, on_progress=self._on_progress)
             self.state.advance("agent2", "done")
 
             self.state.advance("agent3", "running")

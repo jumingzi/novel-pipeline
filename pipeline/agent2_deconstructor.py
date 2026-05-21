@@ -1,5 +1,7 @@
+import asyncio
 import json
 from dataclasses import dataclass
+from typing import Optional, Callable, Awaitable
 from pipeline.api_client import DeepSeekClient
 
 
@@ -87,14 +89,50 @@ async def deconstruct_chunk(
 
 
 async def deconstruct_all_chunks(
-    client: DeepSeekClient, chunks: list, prev_context: str = ""
+    client: DeepSeekClient, chunks: list, prev_context: str = "",
+    on_progress: Optional[Callable[[dict], Awaitable[None]]] = None,
+    parallel: int = 3,
 ) -> list[DeconstructionResult]:
-    results = []
-    for i, chunk in enumerate(chunks):
-        ctx = prev_context if i == 0 else (_summarize_prev(results[-1]) if results else "")
-        result = await deconstruct_chunk(client, chunk.content, ctx)
-        results.append(result)
+    total = len(chunks)
+    results = [None] * total
+
+    async def _send(msg: str):
+        if on_progress:
+            await on_progress({"agent_id": "agent2", "status": "running", "message": msg, "timestamp": __import__("time").time()})
+
+    await _send(f"开始拆解 {total} 个文本块 (并行{parallel})")
+
+    # Process in parallel batches
+    for batch_start in range(0, total, parallel):
+        batch_end = min(batch_start + parallel, total)
+        tasks = []
+        for i in range(batch_start, batch_end):
+            chunk = chunks[i]
+            # For first batch and first item, use prev_context; otherwise summarize prev batch
+            ctx = ""
+            if i == 0 and prev_context:
+                ctx = prev_context
+            elif i > 0 and results[i-1]:
+                ctx = _summarize_prev(results[i-1])
+            tasks.append(_deconstruct_one(client, chunk, ctx, i))
+
+        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+        for i, r in zip(range(batch_start, batch_end), batch_results):
+            if isinstance(r, Exception):
+                await _send(f"Chunk {i+1}/{total} 失败: {r}")
+                results[i] = DeconstructionResult([], [], {}, [], {}, {"planted": [], "resolved": []})
+            else:
+                results[i] = r
+
+        done = min(batch_end, total)
+        await _send(f"进度: {done}/{total} chunks")
+
+    await _send(f"拆解完成: {total} 个文本块")
     return results
+
+
+async def _deconstruct_one(client, chunk, ctx: str, idx: int):
+    return await deconstruct_chunk(client, chunk.content, ctx)
 
 
 def _summarize_prev(prev: DeconstructionResult) -> str:
