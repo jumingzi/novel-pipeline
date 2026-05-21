@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+chroma_test/
+chroma_store/*
+!chroma_store/.gitkeep
+uploads/*
+!uploads/.gitkeep
+.env
