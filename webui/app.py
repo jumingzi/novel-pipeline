@@ -1,8 +1,12 @@
 import json
+import os
 import uuid
 from pathlib import Path
 
 import logging
+
+# Suppress ChromaDB telemetry noise (library bug with posthog)
+logging.getLogger("chromadb").setLevel(logging.ERROR)
 
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
@@ -12,6 +16,9 @@ from fastapi.templating import Jinja2Templates
 from pipeline.orchestrator import PipelineOrchestrator
 from config import load_api_key
 
+# Suppress "Skipping data after last boundary" multipart warning
+logging.getLogger("multipart").setLevel(logging.ERROR)
+
 # Silence /api/state and /api/events polling noise
 class PollFilter(logging.Filter):
     def filter(self, record):
@@ -20,6 +27,15 @@ class PollFilter(logging.Filter):
         return not skip
 
 logging.getLogger("uvicorn.access").addFilter(PollFilter())
+
+# Also suppress root-level "Failed to send telemetry" prints
+import sys
+_original_stderr_write = sys.stderr.write
+def _filtered_stderr_write(s):
+    if "Failed to send telemetry" in s:
+        return len(s)
+    return _original_stderr_write(s)
+sys.stderr.write = _filtered_stderr_write
 
 app = FastAPI(title="小说矩阵工坊")
 
