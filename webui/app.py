@@ -2,6 +2,8 @@ import json
 import uuid
 from pathlib import Path
 
+import logging
+
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -9,6 +11,15 @@ from fastapi.templating import Jinja2Templates
 
 from pipeline.orchestrator import PipelineOrchestrator
 from config import load_api_key
+
+# Silence /api/state and /api/events polling noise
+class PollFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        skip = ("/api/state" in msg or "/api/events" in msg)
+        return not skip
+
+logging.getLogger("uvicorn.access").addFilter(PollFilter())
 
 app = FastAPI(title="小说矩阵工坊")
 

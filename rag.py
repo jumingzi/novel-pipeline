@@ -1,3 +1,6 @@
+import os
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "false")
+
 import json
 import chromadb
 import tiktoken
