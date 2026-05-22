@@ -19,6 +19,17 @@
 
   <nav class="sidebar-nav">
 
+    <!-- 项目列表 Section -->
+    <div class="nav-section open" id="nav-section-projects">
+      <div class="nav-section-header" data-section="projects">
+        <span class="icon">📁</span> 项目列表
+        <span class="arrow">▶</span>
+      </div>
+      <div class="nav-items" id="projectListItems">
+        <div class="nav-item" style="color:var(--ink-light);font-size:11px;">加载中...</div>
+      </div>
+    </div>
+
     <!-- 拆书 Section -->
     <div class="nav-section open" id="nav-section-deconstruct">
       <div class="nav-section-header" data-section="deconstruct">
@@ -670,7 +681,50 @@ async function fetchState() {
   } catch(e) {}
 }
 
+// ============ PROJECT MANAGEMENT ============
+let currentProject = '';
+let allProjects = [];
+
+async function loadProjects() {
+  try {
+    const res = await fetch('/api/state');
+    const data = await res.json();
+    allProjects = data.projects || [];
+    if (data.knowledge_base?.project) {
+      currentProject = data.knowledge_base.project;
+    }
+    renderProjectList();
+  } catch(e) {}
+}
+
+function renderProjectList() {
+  const container = document.getElementById('projectListItems');
+  if (!allProjects.length) {
+    container.innerHTML = '<div class="nav-item" style="color:var(--ink-light);font-size:11px;">暂无项目</div>';
+    return;
+  }
+  container.innerHTML = allProjects.map(p =>
+    `<div class="nav-item${p === currentProject ? ' active' : ''}" onclick="selectProject('${escapeHtml(p)}')">
+      <span class="dot"></span> ${escapeHtml(p)}
+    </div>`
+  ).join('');
+}
+
+async function selectProject(projectName) {
+  currentProject = projectName;
+  renderProjectList();
+  // Load project data from KB
+  try {
+    const res = await fetch('/api/state?project=' + encodeURIComponent(projectName));
+    const data = await res.json();
+    analysisResult = data.result;
+    renderKBPanels(data.knowledge_base, data.knowledge_base?.genre || '');
+    openPanel('kb-characters');
+  } catch(e) {}
+}
+
 // Initial fetch on load
+loadProjects();
 fetchState();
 setInterval(fetchState, 4000);
 

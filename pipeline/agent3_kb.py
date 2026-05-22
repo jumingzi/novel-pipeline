@@ -116,6 +116,8 @@ async def update_knowledge_base(
     all_style = {}
     all_foreshadowing = {"planted": [], "resolved": []}
 
+    print(f"[Agent3] 开始归档: project={project}, chunks={len(decon_results)}", flush=True)
+
     for r in decon_results:
         all_chars.extend(r.characters)
         all_hooks.extend(r.hooks)
@@ -156,6 +158,7 @@ async def update_knowledge_base(
             "genre": genre, "chapter": c.get("chapter", 0),
         }])
 
+    print(f"[Agent3] 归档完成: genre={genre}, chars={len(merged_chars)}", flush=True)
     return {"genre": genre, "character_count": len(merged_chars)}
 
 
