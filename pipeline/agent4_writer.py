@@ -3,17 +3,25 @@ import json
 from config import ANTI_AI_CLICHES
 
 
-CHAPTER_SYSTEM = """你是一位专业网络小说作家，擅长模仿特定文风进行创作。
+CHAPTER_SYSTEM = """你是一位专业网络小说作家，擅长模仿特定文风进行创作。你的文字必须读起来像真人作者，不能有丝毫AI痕迹。
 
 ## 创作原则
 1. **文风克隆**: 严格按照提供的文风DNA和对标书样本进行创作，包括词汇频率、句式节奏、镜头切换顺序
-2. **Show, Don't Tell**: 严禁直接用形容词定义人物心理。必须通过动作、环境、细节折射情绪
+2. **Show, Don't Tell（铁律）**: 严禁用"他感到""他心中""他不由得"等心理直述。情绪必须通过具体动作、环境、生理反应折射。错："林羽非常愤怒"。对："林羽五指发白，指甲扎进掌心，喉结滚动了一下"。
 3. **钩子规则**: 章节开头200字内收束上一章的悬念钩子。章节结尾200字内埋下一个新钩子
-4. **去AI味**: 禁止使用模板化过渡句、形容词堆叠、无意义的风景感官描写堆砌
-5. **对白节奏**: 对话与动作/心理描写穿插，避免连续长段纯对话
+4. **去AI味（铁律）**:
+   - 禁止模板化过渡句、形容词堆叠、无意义风景描写
+   - 禁止"眼眸闪过""嘴角勾起""瞳孔一缩""倒吸一口凉气"等AI最爱用的表情套话
+   - 禁止"一股...的力量""爆发出一阵"等AI高频句式
+   - 每段开头不要雷同（如连续三段以"他"开头视为失败）
+   - 不要用"不知过了多久""转眼间""紧接着"等流水账过渡
+5. **对白节奏**: 对话必须短促有力，穿插动作和留白。避免一人说教式长对白。对白中不要出现"他说道""她回答道"等多余引导词，直接用动作承接。
 
-## 禁止使用的词汇和句式
+## 禁用词汇和句式（违反一项即视为创作失败）
 {cliche_list}
+
+## 质量自检
+写完每个段落，问自己：这段文字读起来像真人写的还是AI写的？如果段落开头有3个以上连续"他"字句，重写。如果出现任何禁用词汇，重写。
 
 请按以上要求创作完整的章节正文，字数约 {word_count} 字。"""
 
@@ -91,7 +99,54 @@ def detect_dialogue_imbalance(text):
     return issues
 
 
+def analyze_ai_score(text: str) -> dict:
+    """Analyze the text for AI-slop patterns and return a score (lower = more human-like)."""
+    flags = []
+    score = 0
+    # Count AI cliche occurrences
+    for cliche in ANTI_AI_CLICHES:
+        count = text.count(cliche)
+        if count > 0:
+            flags.append({"pattern": cliche, "count": count, "type": "禁用词"})
+            score += count * 3
+    # Check paragraph-start repetition
+    paragraphs = [p.strip() for p in text.split("\n") if p.strip()]
+    starters = [p[:2] for p in paragraphs if len(p) >= 2]
+    for i, s in enumerate(starters):
+        if starters.count(s) >= 4:
+            flags.append({"pattern": f"连续以'{s}'开头", "count": starters.count(s), "type": "句式雷同"})
+            score += starters.count(s) * 2
+            break
+    # Check adjectives before nouns pattern
+    adj_patterns = ["的" + c for c in "东西事人之物法术力量存在感觉体验"]
+    for ap in adj_patterns:
+        count = text.count(ap)
+        if count > 3:
+            flags.append({"pattern": ap, "count": count, "type": "修饰冗余"})
+            score += count
+    return {"ai_score": score, "flags": flags, "verdict": "优秀" if score < 5 else "轻度AI味" if score < 15 else "中度AI味" if score < 30 else "高度AI味，建议重写"}
+
+
 def post_process_chapter(raw_text):
+    text = remove_ai_cliches(raw_text)
+    issues = detect_dialogue_imbalance(text)
+    ai_report = analyze_ai_score(text)
+
+    # Append AI味报告
+    report = "\n\n[AI味检测报告]\n"
+    report += f"评分: {ai_report['verdict']} (分数: {ai_report['ai_score']})\n"
+    for f in ai_report['flags'][:5]:
+        report += f"- [{f['type']}] {f['pattern']} 出现{f['count']}次\n"
+
+    if issues:
+        text += "\n\n[对话平衡检测]\n"
+        for issue in issues:
+            text += f"- {issue}\n"
+
+    if text and not text.rstrip().endswith(("。", "！", "？", "…", '"', "'", "」")):
+        text = text.rstrip() + "。"
+
+    return text + report
     text = remove_ai_cliches(raw_text)
     issues = detect_dialogue_imbalance(text)
     if issues:
