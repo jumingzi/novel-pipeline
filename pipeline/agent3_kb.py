@@ -9,14 +9,19 @@ class KnowledgeBase:
     def __init__(self, base_dir: str = "./knowledge_base"):
         self.base_dir = base_dir
 
-    def _genre_path(self, genre: str) -> str:
-        return os.path.join(self.base_dir, genre)
+    def _project_path(self, project: str) -> str:
+        return os.path.join(self.base_dir, project)
 
-    def _ensure_dir(self, genre: str):
-        os.makedirs(self._genre_path(genre), exist_ok=True)
+    def _ensure_dir(self, project: str):
+        os.makedirs(self._project_path(project), exist_ok=True)
 
-    def save_genre_data(self, genre: str, data: dict):
-        self._ensure_dir(genre)
+    def list_projects(self) -> list[str]:
+        if not os.path.exists(self.base_dir):
+            return []
+        return [d for d in os.listdir(self.base_dir) if os.path.isdir(os.path.join(self.base_dir, d)) and not d.startswith('.')]
+
+    def save_project_data(self, project: str, data: dict):
+        self._ensure_dir(project)
         files = {
             "characters": "character_cards.json",
             "plot_timeline": "plot_timeline.json",
@@ -25,11 +30,11 @@ class KnowledgeBase:
         }
         for key, filename in files.items():
             if key in data and data[key]:
-                filepath = os.path.join(self._genre_path(genre), filename)
+                filepath = os.path.join(self._project_path(project), filename)
                 with open(filepath, "w", encoding="utf-8") as f:
                     json.dump(data[key], f, ensure_ascii=False, indent=2)
 
-    def load_genre_data(self, genre: str) -> dict:
+    def load_project_data(self, project: str) -> dict:
         result = {}
         files = {
             "characters": "character_cards.json",
@@ -38,14 +43,14 @@ class KnowledgeBase:
             "style_profile": "style_profile.json",
         }
         for key, filename in files.items():
-            filepath = os.path.join(self._genre_path(genre), filename)
+            filepath = os.path.join(self._project_path(project), filename)
             if os.path.exists(filepath):
                 with open(filepath, "r", encoding="utf-8") as f:
                     result[key] = json.load(f)
         return result
 
-    def update_genre_data(self, genre: str, new_data: dict):
-        existing = self.load_genre_data(genre)
+    def update_project_data(self, project: str, new_data: dict):
+        existing = self.load_project_data(project)
         for key in ["characters", "plot_timeline", "world_settings", "style_profile"]:
             if key in new_data and new_data[key]:
                 if key in existing:
@@ -55,7 +60,7 @@ class KnowledgeBase:
                         existing[key] = {**existing[key], **new_data[key]}
                 else:
                     existing[key] = new_data[key]
-        self.save_genre_data(genre, existing)
+        self.save_project_data(project, existing)
 
 
 def merge_lists(existing: list, new: list, key: str = "name") -> list:
@@ -104,6 +109,7 @@ def merge_character_cards(existing: list[dict], new_chars: list[dict]) -> list[d
 async def update_knowledge_base(
     kb: KnowledgeBase, rag: NovelRAG,
     decon_results: list[DeconstructionResult], genre: str = "",
+    project: str = "",
 ) -> dict:
     all_chars = []
     all_hooks = []
@@ -125,11 +131,13 @@ async def update_knowledge_base(
 
     if not genre:
         genre = detect_genre(all_chars, all_hooks)
+    if not project:
+        project = genre
 
-    existing = kb.load_genre_data(genre)
+    existing = kb.load_project_data(project)
     merged_chars = merge_character_cards(existing.get("characters", []), all_chars)
 
-    kb.update_genre_data(genre, {
+    kb.update_project_data(project, {
         "characters": merged_chars,
         "plot_timeline": merge_lists(
             existing.get("plot_timeline", []),
@@ -137,10 +145,11 @@ async def update_knowledge_base(
             key="description",
         ),
         "style_profile": {**existing.get("style_profile", {}), **all_style},
+        "world_settings": {**existing.get("world_settings", {}), "genre": genre},
     })
 
     for i, c in enumerate(merged_chars):
-        cid = f"{genre}_{c.get('name', f'unknown_{i}')}"
+        cid = f"{project}_{c.get('name', f'unknown_{i}')}"
         rag.add_characters([{
             "id": cid, "name": c.get("name", ""),
             "description": json.dumps(c, ensure_ascii=False),
@@ -153,6 +162,7 @@ async def update_knowledge_base(
 async def build_retrieval_context(
     rag: NovelRAG, kb: KnowledgeBase, genre: str,
     current_context: str, character_names: list[str] = None,
+    project: str = "",
 ) -> RetrievalContext:
     ctx = RetrievalContext()
     if character_names:
@@ -164,8 +174,9 @@ async def build_retrieval_context(
         ctx.characters = results
     results = rag.query_plot_events(current_context[:200], genre, top_k=10)
     ctx.plot_events = results
-    genre_data = kb.load_genre_data(genre)
-    ctx.style_dna = genre_data.get("style_profile", {})
-    ctx.world_settings = genre_data.get("world_settings", {})
+    proj = project or genre
+    data = kb.load_project_data(proj)
+    ctx.style_dna = data.get("style_profile", {})
+    ctx.world_settings = data.get("world_settings", {})
     ctx = ctx.trim_to_tokens(AGENT4_MAX_CONTEXT_TOKENS)
     return ctx

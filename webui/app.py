@@ -103,10 +103,11 @@ async def start_analysis(
     reference_paths: str = Form(""),
     start_chapter: int = Form(0),
     end_chapter: int = Form(0),
+    fast_mode: bool = Form(True),
 ):
     orch = get_orchestrator()
     refs = json.loads(reference_paths) if reference_paths else None
-    orch.start_analysis_background(file_path, genre, refs, start_chapter, end_chapter)
+    orch.start_analysis_background(file_path, genre, refs, start_chapter, end_chapter, fast_mode)
     return JSONResponse({"status": "started"})
 
 
@@ -139,12 +140,24 @@ async def get_inspiration_endpoint(stuck_point: str = Form(...)):
     return JSONResponse({"suggestion": suggestion})
 
 
+@app.post("/api/stop")
+async def stop_pipeline():
+    orch = get_orchestrator()
+    orch.cancel()
+    return JSONResponse({"status": "cancelled"})
+
+
 @app.get("/api/state")
-async def get_state():
+async def get_state(project: str = ""):
     orch = get_orchestrator()
     state = orch.state
+    proj = project or state.result.get("project", "") if state.result else ""
     genre = state.result.get("genre", "玄幻") if state.result else "玄幻"
-    genre_data = orch.kb.load_genre_data(genre)
+    # Load per-project data if project is set, otherwise from state
+    if proj:
+        data = orch.kb.load_project_data(proj)
+    else:
+        data = orch.kb.load_project_data(genre)
     return JSONResponse({
         "progress": state.progress,
         "current_step": state.current_step,
@@ -152,14 +165,16 @@ async def get_state():
         "is_error": state.is_error,
         "result": state.result if state.result else {},
         "knowledge_base": {
-            "characters": genre_data.get("characters", []),
-            "character_count": len(genre_data.get("characters", [])),
-            "plot_timeline": genre_data.get("plot_timeline", []),
-            "foreshadowing_count": len(genre_data.get("plot_timeline", [])),
-            "style_profile": genre_data.get("style_profile", {}),
-            "world_settings": genre_data.get("world_settings", {}),
+            "characters": data.get("characters", []),
+            "character_count": len(data.get("characters", [])),
+            "plot_timeline": data.get("plot_timeline", []),
+            "foreshadowing_count": len(data.get("plot_timeline", [])),
+            "style_profile": data.get("style_profile", {}),
+            "world_settings": data.get("world_settings", {}),
             "genre": genre,
+            "project": proj,
         },
+        "projects": orch.kb.list_projects(),
     })
 
 

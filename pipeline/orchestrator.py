@@ -59,25 +59,44 @@ class PipelineOrchestrator:
         self.kb = KnowledgeBase(base_dir=kb_dir)
         self.rag = NovelRAG(persist_dir=chroma_dir)
         self._thread = None
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+        self.state.current_step = "cancelled"
+        self.state.error = "用户手动停止"
+
+    def _check_cancel(self):
+        if self._cancelled:
+            raise RuntimeError("cancelled")
 
     async def _on_progress(self, event: dict):
         self.state.advance(event["agent_id"], event["status"])
         await self.bus.emit({**event, "progress": self.state.progress})
 
     async def run_analysis(self, filepath: str, genre: str = "", reference_files: list[str] = None,
-                             start_chapter: int = 0, end_chapter: int = 0) -> dict:
+                             start_chapter: int = 0, end_chapter: int = 0, fast_mode: bool = True) -> dict:
+        self._cancelled = False
+        # Fast mode: disable thinking for speed
+        if fast_mode:
+            import copy
+            self.client._fast_mode = True
         try:
             self.state.advance("agent1", "running")
             chunks = process_file(filepath, start_chapter=start_chapter, end_chapter=end_chapter)
+            raw_name = filepath.replace('\\', '/').split('/')[-1].rsplit('.', 1)[0]
+            project = genre or raw_name
             self.state.advance("agent1", "done")
+            self._check_cancel()
 
             self.state.advance("agent2", "running")
-            decon_results = await deconstruct_all_chunks(self.client, chunks, on_progress=self._on_progress)
+            decon_results = await deconstruct_all_chunks(self.client, chunks, on_progress=self._on_progress, cancel_check=lambda: self._check_cancel())
             self.state.advance("agent2", "done")
+            self._check_cancel()
 
             self.state.advance("agent3", "running")
             genre = genre or "玄幻"
-            kb_result = await update_knowledge_base(self.kb, self.rag, decon_results, genre)
+            kb_result = await update_knowledge_base(self.kb, self.rag, decon_results, genre, project=project)
             self.state.advance("agent3", "done")
 
             ref_style = ""
@@ -85,6 +104,7 @@ class PipelineOrchestrator:
                 ref_style = extract_reference_samples(reference_files)
 
             self.state.result = {
+                "project": project,
                 "chunks": [{"chunk_id": c.chunk_id, "token_count": c.token_count} for c in chunks],
                 "genre": kb_result["genre"],
                 "character_count": kb_result["character_count"],
@@ -92,6 +112,11 @@ class PipelineOrchestrator:
                 "decon_results": [r.to_dict() for r in decon_results],
             }
             return self.state.result
+        except RuntimeError as e:
+            if str(e) == "cancelled":
+                return self.state.result
+            self.state.set_error(str(e))
+            raise
         except Exception as e:
             self.state.set_error(str(e))
             raise
@@ -100,8 +125,9 @@ class PipelineOrchestrator:
                            reference_style: str = "") -> str:
         try:
             self.state.advance("agent4", "running")
-            ctx = await build_retrieval_context(self.rag, self.kb, genre, outline)
-            style = self.kb.load_genre_data(genre).get("style_profile", {})
+            ctx = await build_retrieval_context(self.rag, self.kb, genre, outline, project=project)
+            proj = project or genre
+            style = self.kb.load_project_data(proj).get("style_profile", {})
             chapter = await generate_chapter(self.client, outline, ctx.to_prompt_text(), style,
                                               reference_style, word_count)
             self.state.advance("agent4", "done")
@@ -123,9 +149,9 @@ class PipelineOrchestrator:
         return [f"参考剧情: {r['description']}" for r in results]
 
     def start_analysis_background(self, filepath: str, genre: str = "", reference_files: list[str] = None,
-                                    start_chapter: int = 0, end_chapter: int = 0):
+                                    start_chapter: int = 0, end_chapter: int = 0, fast_mode: bool = True):
         self._thread = threading.Thread(
-            target=lambda: asyncio.run(self.run_analysis(filepath, genre, reference_files, start_chapter, end_chapter)),
+            target=lambda: asyncio.run(self.run_analysis(filepath, genre, reference_files, start_chapter, end_chapter, fast_mode)),
             daemon=True)
         self._thread.start()
 

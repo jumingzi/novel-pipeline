@@ -105,6 +105,11 @@
   </div>
 
   <div class="sidebar-actions">
+    <div class="setting-row" style="margin-bottom:4px;">
+      <label style="font-size:11px;color:var(--ink-light);">快速模式</label>
+      <div class="toggle on" id="fastToggle" onclick="this.classList.toggle('on')"></div>
+      <span style="font-size:10px;color:var(--ink-light);">关掉=深度思考(慢10倍)</span>
+    </div>
     <div class="chapter-range">
       章节 <input type="number" id="chStart" value="1" min="1" placeholder="起"> —
       <input type="number" id="chEnd" value="0" min="0" placeholder="终">
@@ -130,13 +135,14 @@
     <div class="tab-panel active welcome-panel" id="panel-welcome">
       <div class="seal">墨</div>
       <p>从左侧选择一个功能开始。<br>拆解小说、查阅知识库、或生成新章节。</p>
-      <div class="progress-row" style="margin-top:24px;justify-content:center;">
+      <div class="progress-row" style="margin-top:24px;justify-content:center;flex-wrap:wrap;gap:8px;">
         <div class="progress-dots" id="progressDots">
           <span class="progress-dot" title="文件处理"></span>
           <span class="progress-dot" title="拆书分析"></span>
           <span class="progress-dot" title="知识归档"></span>
           <span class="progress-dot" title="AI写手"></span>
         </div>
+        <button class="btn btn-sm" id="stopBtn" onclick="stopPipeline()" style="display:none;color:var(--cinnabar);border-color:var(--cinnabar);">停止</button>
       </div>
     </div>
 
@@ -446,6 +452,7 @@ async function startAnalyze() {
   fd.append('reference_paths', JSON.stringify(refFilePaths));
   fd.append('start_chapter', document.getElementById('chStart').value || '0');
   fd.append('end_chapter', document.getElementById('chEnd').value || '0');
+  fd.append('fast_mode', document.getElementById('fastToggle').classList.contains('on'));
 
   try {
     const res = await fetch('/api/analyze', { method: 'POST', body: fd });
@@ -860,7 +867,21 @@ function renderLastChapter(chapter) {
   }
 }
 
+async function stopPipeline() {
+  try {
+    await fetch('/api/stop', { method: 'POST' });
+    toast('已发送停止信号');
+  } catch(e) { toast('停止失败'); }
+}
+
 function syncProgressDots(data) {
+  const stopBtn = document.getElementById('stopBtn');
+  // Show stop button when pipeline is running
+  if (data.current_step && data.current_step !== 'idle' && data.progress > 0 && data.progress < 1) {
+    stopBtn.style.display = 'inline-block';
+  } else {
+    stopBtn.style.display = 'none';
+  }
   const stepMap = { 'idle': -1, 'agent1': 0, 'agent2': 1, 'agent3': 2, 'agent4': 3 };
   const current = stepMap[data.current_step] || -1;
   const dots = document.querySelectorAll('#progressDots .progress-dot');

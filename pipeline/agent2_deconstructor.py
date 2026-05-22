@@ -95,7 +95,8 @@ async def deconstruct_chunk(
 async def deconstruct_all_chunks(
     client: DeepSeekClient, chunks: list, prev_context: str = "",
     on_progress: Optional[Callable[[dict], Awaitable[None]]] = None,
-    parallel: int = 3,
+    parallel: int = 10,
+    cancel_check: Optional[Callable[[], None]] = None,
 ) -> list[DeconstructionResult]:
     total = len(chunks)
     results = [None] * total
@@ -109,7 +110,8 @@ async def deconstruct_all_chunks(
 
     # Process in parallel batches
     for batch_start in range(0, total, parallel):
-        batch_end = min(batch_start + parallel, total)
+        if cancel_check:
+            cancel_check()
 
         # Signal each chunk starting
         for i in range(batch_start, batch_end):

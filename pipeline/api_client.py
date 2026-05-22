@@ -56,6 +56,7 @@ class DeepSeekClient:
     def __init__(self, api_key: Optional[str] = None, progress_callback: Optional[Callable[[dict], Awaitable[None]]] = None):
         self.api_key = api_key or load_api_key()
         self.progress_callback = progress_callback
+        self._fast_mode = False
 
     async def _emit(self, agent_id: str, status: str, message: str = ""):
         if self.progress_callback:
@@ -81,8 +82,8 @@ class DeepSeekClient:
             "temperature": cfg["temperature"],
         }
 
-        # thinking mode
-        if cfg.get("thinking"):
+        # thinking mode (skip if fast_mode)
+        if cfg.get("thinking") and not self._fast_mode:
             body["thinking"] = {"type": "enabled"}
             if "reasoning_effort" in cfg:
                 body["thinking"]["reasoning_effort"] = cfg["reasoning_effort"]

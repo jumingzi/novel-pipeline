@@ -53,20 +53,29 @@ class TestKnowledgeBase:
 
     def test_save_and_load(self):
         kb = KnowledgeBase(base_dir=self.tmpdir)
-        kb.save_genre_data("玄幻", {
+        kb.save_project_data("斗破苍穹", {
             "characters": [{"name": "A"}],
             "plot_timeline": [],
             "world_settings": {},
             "style_profile": {},
         })
-        loaded = kb.load_genre_data("玄幻")
+        loaded = kb.load_project_data("斗破苍穹")
         assert loaded["characters"][0]["name"] == "A"
 
     def test_update_accumulates(self):
         kb = KnowledgeBase(base_dir=self.tmpdir)
-        kb.save_genre_data("玄幻", {"characters": [{"name": "A"}]})
-        kb.update_genre_data("玄幻", {"characters": [{"name": "B"}]})
-        loaded = kb.load_genre_data("玄幻")
+        kb.save_project_data("斗破苍穹", {"characters": [{"name": "A"}]})
+        kb.update_project_data("斗破苍穹", {"characters": [{"name": "B"}]})
+        loaded = kb.load_project_data("斗破苍穹")
         names = [c["name"] for c in loaded["characters"]]
         assert "A" in names
         assert "B" in names
+
+    def test_list_projects(self):
+        kb = KnowledgeBase(base_dir=self.tmpdir)
+        kb.save_project_data("斗破苍穹", {"characters": []})
+        kb.save_project_data("凡人修仙传", {"characters": []})
+        projects = kb.list_projects()
+        assert "斗破苍穹" in projects
+        assert "凡人修仙传" in projects
+        assert len(projects) == 2
