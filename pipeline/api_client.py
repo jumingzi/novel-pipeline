@@ -14,32 +14,21 @@ API_ENDPOINT = f"{DEEPSEEK_BASE_URL}/v1/chat/completions"
 
 
 def fix_json_output(raw: str) -> str:
-    """Attempt to extract valid JSON from a potentially malformed response."""
+    """Extract valid JSON from potentially noisy API response (thinking mode, etc)."""
     text = raw.strip()
 
     # Remove markdown code fences
     text = re.sub(r"^```(?:json)?\s*\n?", "", text)
     text = re.sub(r"\n?```\s*$", "", text)
 
-    # If the text starts with non-JSON content, try to find the first { or [
-    first_brace = text.find("{")
-    first_bracket = text.find("[")
-    start = 0
-    if first_brace != -1 and first_bracket != -1:
-        start = min(first_brace, first_bracket)
-    elif first_brace != -1:
-        start = first_brace
-    elif first_bracket != -1:
-        start = first_bracket
-
-    if start > 0:
-        text = text[start:]
-
-    # Try to find matching closing bracket
-    if text.startswith("{"):
+    # Find ALL complete JSON objects in the text, return the largest valid one
+    candidates = []
+    for m in re.finditer(r"\{", text):
+        start = m.start()
+        candidate = text[start:]
         depth = 0
         end = -1
-        for i, ch in enumerate(text):
+        for i, ch in enumerate(candidate):
             if ch == "{":
                 depth += 1
             elif ch == "}":
@@ -48,7 +37,17 @@ def fix_json_output(raw: str) -> str:
                     end = i + 1
                     break
         if end > 0:
-            text = text[:end]
+            candidate = candidate[:end]
+            try:
+                json.loads(candidate)
+                candidates.append((len(candidate), candidate))
+            except json.JSONDecodeError:
+                continue
+
+    if candidates:
+        # Return the largest valid JSON object (outermost)
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        return candidates[0][1]
 
     return text.strip()
 
@@ -88,8 +87,8 @@ class DeepSeekClient:
             if "reasoning_effort" in cfg:
                 body["thinking"]["reasoning_effort"] = cfg["reasoning_effort"]
 
-        # response_format for json agents
-        if cfg.get("response_format") == "json_object":
+        # response_format — skip when thinking is enabled (API doesn't support both)
+        if cfg.get("response_format") == "json_object" and not cfg.get("thinking"):
             body["response_format"] = {"type": "json_object"}
 
         # optional params
@@ -127,7 +126,14 @@ class DeepSeekClient:
                         continue
                     raise RuntimeError(f"API error after {MAX_RETRIES} retries: HTTP {resp.status_code}")
 
+                if resp.status_code != 200:
+                    data = resp.json()
+                    err = data.get("error", {}).get("message", resp.text)
+                    raise RuntimeError(f"API returned HTTP {resp.status_code}: {err}")
+
                 data = resp.json()
+                if "choices" not in data or not data["choices"]:
+                    raise RuntimeError(f"API returned unexpected response: {json.dumps(data)[:300]}")
                 content = data["choices"][0]["message"]["content"]
 
                 # JSON format validation for agents that return json_object
