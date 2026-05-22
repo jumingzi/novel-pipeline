@@ -138,10 +138,10 @@ async def generate_titles_endpoint(
 async def chat_with_editor(
     message: str = Form(...),
     genre: str = Form("玄幻"),
+    history: str = Form("[]"),
 ):
     """Editor assistant chat — discuss plot, not write chapters."""
     orch = get_orchestrator()
-    # Load KB context for the chat
     proj = orch.state.result.get("project", "") if orch.state.result else ""
     kb_context = ""
     if proj:
@@ -149,7 +149,11 @@ async def chat_with_editor(
         chars = data.get("characters", [])[:10]
         if chars:
             kb_context = "当前作品已收录角色: " + ", ".join(c.get("name", "?") for c in chars)
-    reply = await orch.run_chat(message, genre, kb_context)
+    try:
+        hist = json.loads(history) if history else []
+    except Exception:
+        hist = []
+    reply = await orch.run_chat(message, genre, kb_context, history=hist)
     return JSONResponse({"reply": reply})
 
 

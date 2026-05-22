@@ -294,7 +294,7 @@ let sourceFileName = '';
 let refFilePaths = [];
 let refFileNames = [];
 let savedChapters = [];
-let chatHistory = [];
+let chatHistory = [];  // for AI写手对话 context memory
 let analysisResult = null;
 
 // ============ TAB SYSTEM ============
@@ -577,6 +577,8 @@ async function sendChat() {
   const fd = new FormData();
   fd.append('message', text);
   fd.append('genre', document.getElementById('genGenreSelect').value);
+  // Send last 20 messages as conversation history
+  fd.append('history', JSON.stringify(chatHistory.slice(-20)));
 
   try {
     const controller = new AbortController();
@@ -584,11 +586,15 @@ async function sendChat() {
     const res = await fetch('/api/chat', { method: 'POST', body: fd, signal: controller.signal });
     clearTimeout(timeout);
     const data = await res.json();
+    const reply = data.reply || '...';
     // Remove loading, add real reply
     const loadingEl = document.getElementById(loadingId);
     if (loadingEl) loadingEl.remove();
-    msgs.innerHTML += `<div class="message ai"><div class="msg-content">${escapeHtml(data.reply || '...')}</div></div>`;
+    msgs.innerHTML += `<div class="message ai"><div class="msg-content">${escapeHtml(reply)}</div></div>`;
     msgs.scrollTop = msgs.scrollHeight;
+    // Update conversation history
+    chatHistory.push({ role: 'user', content: text });
+    chatHistory.push({ role: 'assistant', content: reply });
   } catch(e) {
     const loadingEl = document.getElementById(loadingId);
     if (loadingEl) loadingEl.remove();
