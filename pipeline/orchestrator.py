@@ -166,6 +166,26 @@ class PipelineOrchestrator:
     async def run_titles(self, synopsis: str, genre: str) -> str:
         return await generate_titles(self.client, synopsis, genre)
 
+    async def run_chat(self, message: str, genre: str, kb_context: str = "") -> str:
+        """Editor assistant — discuss plot ideas, not write chapters."""
+        import copy
+        orig = self.client._fast_mode
+        self.client._fast_mode = True  # fast replies for chat
+        try:
+            system = "你是一位经验丰富的网文编辑和创作顾问。你不是在写小说，而是在和作者讨论剧情、分析人物、提供建议。请用对话的语气回复，不要长篇大论。每次回复控制在300字以内。"
+            user = f"题材: {genre}\n"
+            if kb_context:
+                user += f"{kb_context}\n"
+            user += f"\n作者提问: {message}"
+            msgs = [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ]
+            reply = await self.client.call("agent4", msgs)
+            return reply
+        finally:
+            self.client._fast_mode = orig
+
     async def run_inspiration(self, stuck_point: str) -> str:
         refs = self._get_related_references(stuck_point)
         return await get_inspiration(self.client, stuck_point, refs)

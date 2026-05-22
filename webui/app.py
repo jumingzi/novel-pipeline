@@ -134,6 +134,25 @@ async def generate_titles_endpoint(
     return JSONResponse({"titles": titles})
 
 
+@app.post("/api/chat")
+async def chat_with_editor(
+    message: str = Form(...),
+    genre: str = Form("玄幻"),
+):
+    """Editor assistant chat — discuss plot, not write chapters."""
+    orch = get_orchestrator()
+    # Load KB context for the chat
+    proj = orch.state.result.get("project", "") if orch.state.result else ""
+    kb_context = ""
+    if proj:
+        data = orch.kb.load_project_data(proj)
+        chars = data.get("characters", [])[:10]
+        if chars:
+            kb_context = "当前作品已收录角色: " + ", ".join(c.get("name", "?") for c in chars)
+    reply = await orch.run_chat(message, genre, kb_context)
+    return JSONResponse({"reply": reply})
+
+
 @app.post("/api/inspiration")
 async def get_inspiration_endpoint(stuck_point: str = Form(...)):
     orch = get_orchestrator()

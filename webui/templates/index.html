@@ -228,7 +228,7 @@
 
     <!-- === 章节生成 Panels === -->
     <div class="tab-panel" id="panel-generate-outline">
-      <h3>细纲输入</h3>
+      <h3>细纲创作</h3>
       <div class="setting-row" style="margin-top:12px;">
         <label>题材</label>
         <select class="genre-select" id="genGenreSelect">
@@ -238,11 +238,12 @@
           <option>体育</option><option>短篇</option><option>恋爱</option>
         </select>
         <label>字数</label>
-        <input type="range" min="2000" max="8000" value="3000" step="500" id="genWordCount" oninput="document.getElementById('wordCountLabel').textContent=this.value">
-        <span id="wordCountLabel" style="font-size:12px;color:var(--ink-light)">3000</span>
+        <input type="range" min="1000" max="5000" value="1500" step="500" id="genWordCount" oninput="document.getElementById('wordCountLabel').textContent=this.value">
+        <span id="wordCountLabel" style="font-size:12px;color:var(--ink-light)">1500</span>
       </div>
       <textarea class="outline-input" id="outlineInput" placeholder="输入本章细纲...&#10;&#10;例如：&#10;1. 林羽踏入秘境，遭遇三阶妖兽&#10;2. 苦战后觉醒新功法&#10;3. 秘境深处发现古修士遗迹"></textarea>
       <button class="btn btn-primary" onclick="startGenerateChapter()">生成章节</button>
+      <div id="outlineChapterResult" style="margin-top:16px;"></div>
     </div>
 
     <div class="tab-panel" id="panel-generate-title">
@@ -271,10 +272,10 @@
     <div class="tab-panel" id="panel-generate-writer">
       <div class="chat-panel">
         <div class="chat-messages" id="chatMessages">
-          <div class="empty-state"><p>与 AI 写手对话，输入细纲或想法开始创作。</p></div>
+          <div class="empty-state"><p>这里是你的专属网文编辑助手。<br>可以讨论剧情走向、人物设定、爽点设计, 也可以直接问「主角被围杀怎么破局」。</p></div>
         </div>
         <div class="chat-input-area">
-          <textarea id="chatInput" rows="2" placeholder="写细纲、提反馈，或输入 /灵感 /书名 ..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+          <textarea id="chatInput" rows="2" placeholder="讨论剧情、请教写法，比如「这里怎么制造爽点」「这个角色会不会太扁平」..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
           <button class="btn btn-primary" onclick="sendChat()">寄</button>
         </div>
       </div>
@@ -533,72 +534,59 @@ async function getInspiration() {
   } catch(e) { toast('获取失败: ' + e.message); }
 }
 
-// ============ CHAT ============
+// ============ CHAPTER GENERATION (Outline Panel) ============
+async function startGenerateChapter() {
+  const outline = document.getElementById('outlineInput').value.trim();
+  if (!outline) { toast('请输入章节细纲'); return; }
+
+  const resultArea = document.getElementById('outlineChapterResult');
+  resultArea.innerHTML = '<div class="spinner"></div> AI写手正在创作中...';
+
+  const fd = new FormData();
+  fd.append('outline', outline);
+  fd.append('genre', document.getElementById('genGenreSelect').value);
+  fd.append('word_count', document.getElementById('genWordCount').value);
+  fd.append('reference_style', analysisResult?.reference_style || '');
+
+  try {
+    await fetch('/api/generate-chapter', { method: 'POST', body: fd });
+    toast('生成已启动，请等待流式输出');
+    // Streaming text will appear via SSE in the outline panel
+  } catch(e) { toast('生成失败: ' + e.message); }
+}
+
+// ============ CHAT (Editor Assistant) ============
 async function sendChat() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
 
-  // Add user message
   const msgs = document.getElementById('chatMessages');
   const empty = msgs.querySelector('.empty-state');
   if (empty) empty.remove();
 
   msgs.innerHTML += `<div class="message user"><div class="msg-content">${escapeHtml(text)}</div></div>`;
-  chatHistory.push({ role: 'user', content: text });
   input.value = '';
   msgs.scrollTop = msgs.scrollHeight;
 
-  let response = '';
+  const fd = new FormData();
+  fd.append('message', text);
+  fd.append('genre', document.getElementById('genGenreSelect').value);
 
-  // Handle slash commands
-  if (text.startsWith('/灵感')) {
-    const fd = new FormData();
-    fd.append('stuck_point', text.replace('/灵感','').trim() || '卡文了');
-    try {
-      const res = await fetch('/api/inspiration', { method: 'POST', body: fd });
-      const data = await res.json();
-      response = data.suggestion || '暂时没有建议。';
-    } catch(e) { response = '获取建议失败：' + e.message; }
-  } else if (text.startsWith('/书名')) {
-    const fd = new FormData();
-    fd.append('synopsis', text.replace('/书名','').trim() || '无概要');
-    fd.append('genre', document.getElementById('genGenreSelect').value);
-    try {
-      const res = await fetch('/api/titles', { method: 'POST', body: fd });
-      const data = await res.json();
-      response = data.titles || '暂时没有标题建议。';
-    } catch(e) { response = '生成标题失败：' + e.message; }
-  } else {
-    // Treat as chapter outline — trigger chapter generation
-    const fd = new FormData();
-    fd.append('outline', text);
-    fd.append('genre', document.getElementById('genGenreSelect').value);
-    fd.append('word_count', document.getElementById('genWordCount').value);
-    try {
-      const res = await fetch('/api/generate-chapter', { method: 'POST', body: fd });
-      await res.json();
-      response = '章节生成已启动，请稍候查看结果...';
-    } catch(e) { response = '生成失败：' + e.message; }
+  try {
+    const res = await fetch('/api/chat', { method: 'POST', body: fd });
+    const data = await res.json();
+    msgs.innerHTML += `<div class="message ai"><div class="msg-content">${escapeHtml(data.reply || '...')}</div></div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch(e) {
+    msgs.innerHTML += `<div class="message ai"><div class="msg-content">抱歉，出错了：${escapeHtml(e.message)}</div></div>`;
   }
-
-  msgs.innerHTML += `<div class="message ai">
-    <div class="msg-content">${escapeHtml(response)}</div>
-    <div class="msg-actions">
-      <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
-      <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
-      <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
-    </div>
-  </div>`;
-  chatHistory.push({ role: 'assistant', content: response });
-  msgs.scrollTop = msgs.scrollHeight;
 }
 
 function adoptChapter(btn) {
   const content = btn.parentElement.previousElementSibling.textContent;
   const chNum = savedChapters.length + 1;
   savedChapters.push({ chapter: chNum, content, time: new Date().toLocaleTimeString() });
-  refreshKBPanel();
   toast(`第${chNum}章已保存到知识库`);
 }
 
@@ -631,32 +619,25 @@ evtSource.onmessage = function(event) {
 
 function handleStreamChunk(chunk) {
   streamBuffer += chunk;
-  const msgs = document.getElementById('chatMessages');
-  const empty = msgs.querySelector('.empty-state');
-  if (empty) empty.remove();
-
-  if (!streamMsgEl) {
-    streamMsgEl = document.createElement('div');
-    streamMsgEl.className = 'message ai';
-    streamMsgEl.innerHTML = '<div class="msg-content"></div>';
-    msgs.appendChild(streamMsgEl);
-  }
-  streamMsgEl.querySelector('.msg-content').textContent = streamBuffer;
-  msgs.scrollTop = msgs.scrollHeight;
+  // Show streaming text in the outline panel
+  const resultArea = document.getElementById('outlineChapterResult');
+  if (!resultArea) return;
+  resultArea.innerHTML = `<div class="message ai"><div class="msg-content">${escapeHtml(streamBuffer)}</div></div>`;
 }
 
 function finalizeStreamedChapter() {
-  if (streamMsgEl && streamBuffer) {
-    // Add action buttons
-    const actions = document.createElement('div');
-    actions.className = 'msg-actions';
-    actions.innerHTML = `
-      <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
-      <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
-      <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
-    `;
-    streamMsgEl.appendChild(actions);
-    chatHistory.push({ role: 'assistant', content: streamBuffer });
+  if (streamBuffer) {
+    const resultArea = document.getElementById('outlineChapterResult');
+    if (resultArea) {
+      resultArea.innerHTML = `<div class="message ai">
+        <div class="msg-content">${escapeHtml(streamBuffer)}</div>
+        <div class="msg-actions">
+          <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
+          <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
+          <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
+        </div>
+      </div>`;
+    }
     lastChapter = streamBuffer;
   }
   streamBuffer = '';
