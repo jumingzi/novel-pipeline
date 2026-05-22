@@ -98,7 +98,8 @@ class PipelineOrchestrator:
             if os.path.exists(ckpt_path):
                 print(f"[Orchestrator] 发现断点, 跳过Agent2直接归档: {project}", flush=True)
                 with open(ckpt_path, "r", encoding="utf-8") as f:
-                    decon_dicts = json.load(f)
+                    ckpt = json.load(f)
+                decon_dicts = ckpt.get("decon_results", ckpt)
                 from pipeline.agent2_deconstructor import DeconstructionResult
                 decon_results = [DeconstructionResult(**d) for d in decon_dicts]
             else:
@@ -107,7 +108,12 @@ class PipelineOrchestrator:
                 decon_dicts = [r.to_dict() if hasattr(r, 'to_dict') else r for r in decon_results]
                 os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
                 with open(ckpt_path, "w", encoding="utf-8") as f:
-                    json.dump(decon_dicts, f, ensure_ascii=False)
+                    json.dump({
+                        "chunk_count": len(decon_dicts),
+                        "file_path": filepath,
+                        "genre": genre,
+                        "decon_results": decon_dicts,
+                    }, f, ensure_ascii=False)
             self.state.advance("agent2", "done")
             self._check_cancel()
 

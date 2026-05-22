@@ -148,6 +148,30 @@ async def stop_pipeline():
     return JSONResponse({"status": "cancelled"})
 
 
+@app.get("/api/checkpoints")
+async def get_checkpoints():
+    """Scan knowledge_base for incomplete analyses (_checkpoint.json)."""
+    orch = get_orchestrator()
+    kb_dir = orch.kb.base_dir
+    checkpoints = []
+    if os.path.exists(kb_dir):
+        for proj in os.listdir(kb_dir):
+            ckpt_path = os.path.join(kb_dir, proj, "_checkpoint.json")
+            if os.path.isfile(ckpt_path):
+                try:
+                    with open(ckpt_path, "r", encoding="utf-8") as f:
+                        ckpt = json.load(f)
+                    checkpoints.append({
+                        "project": proj,
+                        "chunks": ckpt.get("chunk_count", 0),
+                        "file_path": ckpt.get("file_path", ""),
+                        "genre": ckpt.get("genre", ""),
+                    })
+                except Exception:
+                    checkpoints.append({"project": proj, "chunks": 0, "file_path": "", "genre": ""})
+    return JSONResponse({"checkpoints": checkpoints})
+
+
 @app.get("/api/state")
 async def get_state(project: str = ""):
     orch = get_orchestrator()
