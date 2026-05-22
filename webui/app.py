@@ -152,8 +152,13 @@ async def get_state():
         "is_error": state.is_error,
         "result": state.result if state.result else {},
         "knowledge_base": {
+            "characters": genre_data.get("characters", []),
             "character_count": len(genre_data.get("characters", [])),
+            "plot_timeline": genre_data.get("plot_timeline", []),
             "foreshadowing_count": len(genre_data.get("plot_timeline", [])),
+            "style_profile": genre_data.get("style_profile", {}),
+            "world_settings": genre_data.get("world_settings", {}),
+            "genre": genre,
         },
     })
 

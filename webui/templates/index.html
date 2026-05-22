@@ -643,18 +643,18 @@ async function fetchState() {
     // Sync progress dots
     syncProgressDots(data);
 
+    // Always render KB panels (has historical data from disk)
+    renderKBPanels(data.knowledge_base, data.result.genre);
+
     // Check if result changed
     const hash = JSON.stringify(data.result).substring(0, 200);
     if (hash === lastResultHash) return;
     lastResultHash = hash;
 
-    // Populate deconstruct panels
+    // Populate deconstruct panels (only during/after analysis)
     if (data.result.decon_results && data.result.decon_results.length > 0) {
       renderDeconstructResults(data.result.decon_results);
     }
-
-    // Populate KB panels
-    renderKBPanels(data.knowledge_base, data.result.genre);
 
     // Show new chapter
     if (data.result.last_chapter) {
@@ -663,6 +663,8 @@ async function fetchState() {
   } catch(e) {}
 }
 
+// Initial fetch on load
+fetchState();
 setInterval(fetchState, 4000);
 
 // --- Render deconstruct results ---
@@ -761,39 +763,75 @@ function renderDeconstructResults(deconResults) {
 
 // --- KB Panels ---
 function renderKBPanels(kbData, genre) {
-  const chars = kbData?.character_count || analysisResult?.character_count || 0;
+  if (!kbData) return;
 
-  if (chars > 0) {
-    document.getElementById('kbCharEmpty').style.display = 'none';
-  }
+  genre = genre || kbData.genre || '玄幻';
+  const chars = kbData.characters || [];
+  const charCount = kbData.character_count || chars.length;
+  const foreshadowingCount = kbData.foreshadowing_count || 0;
+  const styleProfile = kbData.style_profile || {};
 
-  // Show chapter count and genre
-  const worldPanel = document.getElementById('panel-kb-world');
-  if (worldPanel && genre) {
-    worldPanel.innerHTML = `<h3>世界观设定</h3>
-      <div class="char-card">题材: <strong>${escapeHtml(genre)}</strong></div>
-      <div class="char-card">已收录角色: ${chars} 人</div>
-      <div class="char-card">伏笔线索: ${kbData?.foreshadowing_count || 0} 条</div>`;
-  }
-
-  // Style panel
-  const stylePanel = document.getElementById('panel-kb-style');
-  if (stylePanel && analysisResult?.decon_results?.length) {
-    const lastStyle = analysisResult.decon_results[analysisResult.decon_results.length-1]?.style_dna;
-    if (lastStyle && Object.keys(lastStyle).length) {
-      stylePanel.innerHTML = `<h3>文风档案</h3>
-        <div class="char-card">成语密度: ${lastStyle.idiom_density||'?'}</div>
-        <div class="char-card">对白占比: ${lastStyle.dialogue_ratio||'?'}</div>
-        <div class="char-card">平均句长: ${lastStyle.avg_sentence_length||'?'}</div>
-        ${lastStyle.camera_sequence ? '<div class="char-card">镜头: '+escapeHtml(lastStyle.camera_sequence)+'</div>' : ''}`;
+  // Character cards panel
+  const charGrid = document.getElementById('kbCharGrid');
+  const charEmpty = document.getElementById('kbCharEmpty');
+  if (charCount > 0 && chars.length > 0) {
+    if (charEmpty) charEmpty.style.display = 'none';
+    if (charGrid) {
+      charGrid.innerHTML = chars.slice(0, 50).map(c => `
+        <div class="kb-card">
+          <h4>${escapeHtml(c.name || '未命名')}</h4>
+          ${c.explicit_traits ? '<p>特征: '+escapeHtml(String(c.explicit_traits).substring(0,200))+'</p>' : ''}
+          ${c.hidden_motivation ? '<p>动机: '+escapeHtml(String(c.hidden_motivation).substring(0,200))+'</p>' : ''}
+          ${c.core_conflict ? '<p>矛盾: '+escapeHtml(String(c.core_conflict).substring(0,200))+'</p>' : ''}
+        </div>`).join('');
     }
+  } else {
+    if (charEmpty) charEmpty.style.display = 'block';
+    if (charGrid) charGrid.innerHTML = '';
   }
 
-  // Saved chapters list in KB
+  // World settings panel
+  const worldPanel = document.getElementById('panel-kb-world');
+  if (worldPanel) {
+    worldPanel.innerHTML = `<h3>世界观设定</h3>
+      <div class="kb-card"><h4>题材</h4><p>${escapeHtml(genre)}</p></div>
+      <div class="kb-card"><h4>已收录角色</h4><p>${charCount} 人</p></div>
+      <div class="kb-card"><h4>伏笔线索</h4><p>${foreshadowingCount} 条</p></div>`;
+  }
+
+  // Style profile panel
+  const stylePanel = document.getElementById('panel-kb-style');
+  if (stylePanel && Object.keys(styleProfile).length > 0) {
+    stylePanel.innerHTML = `<h3>文风档案</h3>
+      <div class="kb-card"><h4>成语密度</h4><p>${styleProfile.idiom_density||'?'}</p></div>
+      <div class="kb-card"><h4>对白占比</h4><p>${styleProfile.dialogue_ratio||'?'}</p></div>
+      <div class="kb-card"><h4>平均句长</h4><p>${styleProfile.avg_sentence_length||'?'}</p></div>
+      ${styleProfile.camera_sequence ? '<div class="kb-card"><h4>镜头模式</h4><p>'+escapeHtml(String(styleProfile.camera_sequence))+'</p></div>' : ''}
+      ${styleProfile.sentence_patterns ? '<div class="kb-card"><h4>句式指纹</h4><p>'+escapeHtml(String(styleProfile.sentence_patterns))+'</p></div>' : ''}`;
+  }
+
+  // Plot timeline panel
+  const timelinePanel = document.getElementById('panel-kb-timeline');
+  const timeline = kbData.plot_timeline || [];
+  if (timelinePanel && timeline.length > 0) {
+    let html = '<h3>剧情时间线</h3>';
+    timeline.forEach((entry, i) => {
+      if (entry && entry.hooks) {
+        html += `<div class="kb-card"><h4>第${i+1}批次</h4>`;
+        (entry.hooks || []).slice(0,5).forEach(h => {
+          html += `<p>[${escapeHtml((h.type||''))}] ${escapeHtml((h.description||'').substring(0,100))}</p>`;
+        });
+        html += '</div>';
+      }
+    });
+    timelinePanel.innerHTML = html;
+  }
+
+  // Saved chapters
   if (savedChapters.length > 0) {
-    const timelinePanel = document.getElementById('panel-kb-timeline');
-    if (timelinePanel) {
-      timelinePanel.innerHTML = '<h3>剧情时间线</h3>' + savedChapters.map(c =>
+    const tPanel = document.getElementById('panel-kb-timeline');
+    if (tPanel) {
+      tPanel.innerHTML += '<h3>已保存章节</h3>' + savedChapters.map(c =>
         `<div class="chapter-list-item" onclick="openPanel(\'generate-writer\')">第${c.chapter}章 — ${c.time}</div>`
       ).join('');
     }
