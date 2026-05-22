@@ -122,11 +122,11 @@ class PipelineOrchestrator:
             raise
 
     async def run_chapter(self, outline: str, genre: str, word_count: int = DEFAULT_CHAPTER_WORDS,
-                           reference_style: str = "") -> str:
+                           reference_style: str = "", project: str = "") -> str:
+        proj = project or genre
         try:
             self.state.advance("agent4", "running")
-            ctx = await build_retrieval_context(self.rag, self.kb, genre, outline, project=project)
-            proj = project or genre
+            ctx = await build_retrieval_context(self.rag, self.kb, genre, outline, project=proj)
             style = self.kb.load_project_data(proj).get("style_profile", {})
             chapter = await generate_chapter(self.client, outline, ctx.to_prompt_text(), style,
                                               reference_style, word_count)
