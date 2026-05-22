@@ -569,17 +569,30 @@ async function sendChat() {
   input.value = '';
   msgs.scrollTop = msgs.scrollHeight;
 
+  // Show loading indicator
+  const loadingId = 'loading_' + Date.now();
+  msgs.innerHTML += `<div class="message ai" id="${loadingId}"><div class="msg-content"><span class="spinner"></span> 思考中...</div></div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
   const fd = new FormData();
   fd.append('message', text);
   fd.append('genre', document.getElementById('genGenreSelect').value);
 
   try {
-    const res = await fetch('/api/chat', { method: 'POST', body: fd });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
+    const res = await fetch('/api/chat', { method: 'POST', body: fd, signal: controller.signal });
+    clearTimeout(timeout);
     const data = await res.json();
+    // Remove loading, add real reply
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
     msgs.innerHTML += `<div class="message ai"><div class="msg-content">${escapeHtml(data.reply || '...')}</div></div>`;
     msgs.scrollTop = msgs.scrollHeight;
   } catch(e) {
-    msgs.innerHTML += `<div class="message ai"><div class="msg-content">抱歉，出错了：${escapeHtml(e.message)}</div></div>`;
+    const loadingEl = document.getElementById(loadingId);
+    if (loadingEl) loadingEl.remove();
+    msgs.innerHTML += `<div class="message ai"><div class="msg-content">${e.name === 'AbortError' ? '请求超时，请重试' : '抱歉，出错了：' + escapeHtml(e.message)}</div></div>`;
   }
 }
 
