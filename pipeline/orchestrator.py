@@ -85,7 +85,7 @@ class PipelineOrchestrator:
             self.state.advance("agent1", "running")
             chunks = process_file(filepath, start_chapter=start_chapter, end_chapter=end_chapter)
             raw_name = filepath.replace('\\', '/').split('/')[-1].rsplit('.', 1)[0]
-            project = genre or raw_name
+            project = raw_name
             self.state.advance("agent1", "done")
             self._check_cancel()
 
@@ -156,7 +156,8 @@ class PipelineOrchestrator:
         self._thread.start()
 
     def start_chapter_background(self, outline: str, genre: str, word_count: int = 3000, reference_style: str = ""):
+        proj = self.state.result.get("project", "") if self.state.result else ""
         self._thread = threading.Thread(
-            target=lambda: asyncio.run(self.run_chapter(outline, genre, word_count, reference_style)),
+            target=lambda: asyncio.run(self.run_chapter(outline, genre, word_count, reference_style, project=proj)),
             daemon=True)
         self._thread.start()
