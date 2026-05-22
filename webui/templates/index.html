@@ -665,7 +665,12 @@ async function fetchState() {
     // Always render KB panels (has historical data from disk)
     renderKBPanels(data.knowledge_base, data.result.genre);
 
-    // Check if result changed
+    // Show new chapter (check BEFORE hash — chapter text is deep in the result)
+    if (data.result.last_chapter) {
+      renderLastChapter(data.result.last_chapter);
+    }
+
+    // Check if result changed (skip decon re-render if same)
     const hash = JSON.stringify(data.result).substring(0, 200);
     if (hash === lastResultHash) return;
     lastResultHash = hash;
@@ -673,11 +678,6 @@ async function fetchState() {
     // Populate deconstruct panels (only during/after analysis)
     if (data.result.decon_results && data.result.decon_results.length > 0) {
       renderDeconstructResults(data.result.decon_results);
-    }
-
-    // Show new chapter
-    if (data.result.last_chapter) {
-      renderLastChapter(data.result.last_chapter);
     }
   } catch(e) {}
 }
