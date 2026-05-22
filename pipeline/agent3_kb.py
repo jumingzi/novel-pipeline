@@ -59,8 +59,10 @@ class KnowledgeBase:
 
 
 def merge_lists(existing: list, new: list, key: str = "name") -> list:
-    result = {item.get(key): item for item in existing}
+    result = {item.get(key): item for item in existing if isinstance(item, dict)}
     for item in new:
+        if not isinstance(item, dict):
+            continue
         k = item.get(key)
         if k and k in result:
             result[k] = {**result[k], **item}
@@ -111,11 +113,14 @@ async def update_knowledge_base(
     for r in decon_results:
         all_chars.extend(r.characters)
         all_hooks.extend(r.hooks)
-        if r.style_dna:
+        if r.style_dna and isinstance(r.style_dna, dict):
             all_style = r.style_dna
-        for f in r.foreshadowing.get("planted", []):
+        fw = r.foreshadowing
+        if not isinstance(fw, dict):
+            fw = {"planted": [], "resolved": []}
+        for f in fw.get("planted", []):
             all_foreshadowing["planted"].append(f)
-        for f in r.foreshadowing.get("resolved", []):
+        for f in fw.get("resolved", []):
             all_foreshadowing["resolved"].append(f)
 
     if not genre:

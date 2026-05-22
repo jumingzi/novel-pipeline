@@ -70,6 +70,10 @@ def build_deconstruct_prompt(chunk_text: str, context_note: str = "") -> list[di
 
 def parse_deconstruct_response(raw_json: str) -> DeconstructionResult:
     data = json.loads(raw_json)
+    if isinstance(data, list):
+        data = data[0] if data else {}
+    if not isinstance(data, dict):
+        return DeconstructionResult([], [], {}, [], {}, {"planted": [], "resolved": []})
     return DeconstructionResult(
         characters=data.get("characters", []),
         relationships=data.get("relationships", []),
@@ -142,6 +146,6 @@ async def _deconstruct_one(client, chunk, ctx: str, idx: int):
 
 
 def _summarize_prev(prev: DeconstructionResult) -> str:
-    chars = ", ".join(c.get("name", "?") for c in prev.characters[:5])
-    hooks = ", ".join(h.get("description", "")[:30] for h in prev.hooks[:3])
+    chars = ", ".join(c.get("name", "?") if isinstance(c, dict) else str(c) for c in prev.characters[:5])
+    hooks = ", ".join(h.get("description", "")[:30] if isinstance(h, dict) else str(h) for h in prev.hooks[:3])
     return f"角色: {chars}; 钩子: {hooks}"
