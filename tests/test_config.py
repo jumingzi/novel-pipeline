@@ -16,7 +16,7 @@ def test_agent1_no_thinking():
 
 def test_agent2_high_reasoning():
     assert AGENT_CONFIG["agent2"]["thinking"] is True
-    assert AGENT_CONFIG["agent2"]["reasoning_effort"] == "high"
+    assert AGENT_CONFIG["agent2"]["reasoning_effort"] == "standard"
 
 
 def test_chunk_params():

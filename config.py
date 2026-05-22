@@ -19,7 +19,7 @@ AGENT_CONFIG = {
     },
     "agent2": {
         "thinking": True,
-        "reasoning_effort": "high",
+        "reasoning_effort": "standard",
         "temperature": 0.3,
         "max_tokens": 8192,
         "response_format": "json_object",

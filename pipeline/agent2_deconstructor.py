@@ -100,15 +100,19 @@ async def deconstruct_all_chunks(
         if on_progress:
             await on_progress({"agent_id": "agent2", "status": "running", "message": msg, "timestamp": __import__("time").time()})
 
-    await _send(f"开始拆解 {total} 个文本块 (并行{parallel})")
+    await _send(f"拆解启动: {total} 个文本块 (并行{parallel})")
 
     # Process in parallel batches
     for batch_start in range(0, total, parallel):
         batch_end = min(batch_start + parallel, total)
+
+        # Signal each chunk starting
+        for i in range(batch_start, batch_end):
+            await _send(f"Chunk {i+1}/{total} 开始")
+
         tasks = []
         for i in range(batch_start, batch_end):
             chunk = chunks[i]
-            # For first batch and first item, use prev_context; otherwise summarize prev batch
             ctx = ""
             if i == 0 and prev_context:
                 ctx = prev_context
@@ -119,13 +123,14 @@ async def deconstruct_all_chunks(
         batch_results = await asyncio.gather(*tasks, return_exceptions=True)
         for i, r in zip(range(batch_start, batch_end), batch_results):
             if isinstance(r, Exception):
-                await _send(f"Chunk {i+1}/{total} 失败: {r}")
+                await _send(f"Chunk {i+1}/{total} 失败: {str(r)[:100]}")
                 results[i] = DeconstructionResult([], [], {}, [], {}, {"planted": [], "resolved": []})
             else:
                 results[i] = r
+                await _send(f"Chunk {i+1}/{total} 完成")
 
         done = min(batch_end, total)
-        await _send(f"进度: {done}/{total} chunks")
+        await _send(f"批次完成: {done}/{total}")
 
     await _send(f"拆解完成: {total} 个文本块")
     return results
