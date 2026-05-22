@@ -167,17 +167,29 @@ class PipelineOrchestrator:
         return await generate_titles(self.client, synopsis, genre)
 
     async def run_chat(self, message: str, genre: str, kb_context: str = "", history: list[dict] = None) -> str:
-        """Editor assistant — discuss plot ideas, not write chapters. Supports conversation history."""
+        """Editor assistant — discuss plot ideas, not write chapters. Supports conversation history and KB context."""
         orig = self.client._fast_mode
-        self.client._fast_mode = True  # fast replies for chat
+        self.client._fast_mode = True
         try:
             system = "你是一位经验丰富的网文编辑和创作顾问。你不是在写小说，而是在和作者讨论剧情、分析人物、提供建议。请用对话的语气回复，不要长篇大论。每次回复控制在300字以内。记住之前的对话内容。"
+            # Load style and world context from KB
+            proj = self.state.result.get("project", "") if self.state.result else ""
+            style_note = ""
+            if proj:
+                data = self.kb.load_project_data(proj)
+                style = data.get("style_profile", {})
+                if style:
+                    style_note = f"文风档案: 对白占比{style.get('dialogue_ratio','?')}, 成语密度{style.get('idiom_density','?')}, 镜头模式{style.get('camera_sequence','')}"
+                chars = data.get("characters", [])[:10]
+                if chars:
+                    kb_context = "当前作品角色: " + ", ".join(c.get("name", "?") for c in chars)
             user = f"题材: {genre}\n"
+            if style_note:
+                user += f"{style_note}\n"
             if kb_context:
                 user += f"{kb_context}\n"
             user += f"\n作者提问: {message}"
             msgs = [{"role": "system", "content": system}]
-            # Include conversation history (last 10 turns)
             if history:
                 for h in history[-20:]:
                     msgs.append(h)
