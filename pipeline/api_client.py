@@ -186,6 +186,58 @@ class DeepSeekClient:
 
         raise RuntimeError(f"Unexpected: {last_error}")
 
+    async def call_stream(
+        self,
+        agent_id: str,
+        messages: list[dict],
+        _client: Optional[httpx.AsyncClient] = None,
+    ):
+        """Streaming call — yields text chunks as they arrive. For Agent4."""
+        cfg = AGENT_CONFIG[agent_id]
+        body = {
+            "model": DEEPSEEK_MODEL,
+            "messages": messages,
+            "temperature": cfg["temperature"],
+            "stream": True,
+        }
+        if "frequency_penalty" in cfg:
+            body["frequency_penalty"] = cfg["frequency_penalty"]
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        print(f"[API] {agent_id} streaming request, msgs={sum(len(m.get('content','')) for m in messages)}chars", flush=True)
+
+        async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
+            async with client.stream("POST", API_ENDPOINT, json=body, headers=headers) as resp:
+                if resp.status_code != 200:
+                    data = await resp.aread()
+                    raise RuntimeError(f"Stream API error HTTP {resp.status_code}: {data[:500]}")
+                full_text = ""
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        if data_str == "[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(data_str)
+                            delta = chunk.get("choices", [{}])[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                full_text += content
+                                if self.progress_callback:
+                                    await self.progress_callback({
+                                        "agent_id": agent_id,
+                                        "status": "streaming",
+                                        "message": content,
+                                        "timestamp": time.time(),
+                                    })
+                        except json.JSONDecodeError:
+                            continue
+                return full_text
+
     async def _single_post(self, body: dict, headers: dict, _client=None) -> str:
         try:
             if _client:

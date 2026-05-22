@@ -108,9 +108,11 @@ async def generate_titles(client, synopsis, genre, count=5):
     return await client.call("agent4", msgs)
 
 
-async def generate_chapter(client, outline, retrieval_context, style_dna, reference_style="", word_count=3000):
+async def generate_chapter(client, outline, retrieval_context, style_dna, reference_style="", word_count=1500):
+    print("[Agent4] 开始生成章节 (流式)...", flush=True)
     msgs = build_chapter_prompt(outline, retrieval_context, style_dna, reference_style, word_count)
-    raw = await client.call("agent4", msgs)
+    raw = await client.call_stream("agent4", msgs)
+    print(f"[Agent4] 章节生成完成: {len(raw)}字", flush=True)
     return post_process_chapter(raw)
 
 

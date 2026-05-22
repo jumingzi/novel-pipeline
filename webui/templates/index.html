@@ -604,17 +604,64 @@ function adoptChapter(btn) {
 
 // ============ SSE PROGRESS ============
 const agentLabels = ['文件处理', '拆书分析', '知识归档', 'AI写手'];
+let streamBuffer = '';
+let streamMsgEl = null;
+
 const evtSource = new EventSource('/api/events');
 evtSource.onmessage = function(event) {
   try {
     const data = JSON.parse(event.data);
     updateProgress(data.agent_id, data.status, data.message || '');
+
+    // Streaming text for Agent4
+    if (data.status === 'streaming' && data.message) {
+      handleStreamChunk(data.message);
+    }
+
     // Auto-refresh panels when agent finishes
     if (data.status === 'done') {
+      if (data.agent_id === 'agent4') {
+        // Finalize streamed chapter
+        finalizeStreamedChapter();
+      }
       fetchState();
     }
   } catch(e) {}
 };
+
+function handleStreamChunk(chunk) {
+  streamBuffer += chunk;
+  const msgs = document.getElementById('chatMessages');
+  const empty = msgs.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  if (!streamMsgEl) {
+    streamMsgEl = document.createElement('div');
+    streamMsgEl.className = 'message ai';
+    streamMsgEl.innerHTML = '<div class="msg-content"></div>';
+    msgs.appendChild(streamMsgEl);
+  }
+  streamMsgEl.querySelector('.msg-content').textContent = streamBuffer;
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function finalizeStreamedChapter() {
+  if (streamMsgEl && streamBuffer) {
+    // Add action buttons
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    actions.innerHTML = `
+      <button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button>
+      <button class="btn btn-sm" onclick="toast('请手动微调')">微调</button>
+      <button class="btn btn-sm" onclick="toast('重新生成中...')">重写</button>
+    `;
+    streamMsgEl.appendChild(actions);
+    chatHistory.push({ role: 'assistant', content: streamBuffer });
+    lastChapter = streamBuffer;
+  }
+  streamBuffer = '';
+  streamMsgEl = null;
+}
 
 function updateProgress(agentId, status, message) {
   const dots = document.querySelectorAll('#progressDots .progress-dot');
