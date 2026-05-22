@@ -97,6 +97,7 @@ async def deconstruct_all_chunks(
     results = [None] * total
 
     async def _send(msg: str):
+        print(f"[Agent2] {msg}", flush=True)
         if on_progress:
             await on_progress({"agent_id": "agent2", "status": "running", "message": msg, "timestamp": __import__("time").time()})
 
