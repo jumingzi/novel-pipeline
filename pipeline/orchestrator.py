@@ -163,7 +163,37 @@ class PipelineOrchestrator:
             self.state.set_error(str(e))
             raise
 
+    def _get_kb_summary(self) -> str:
+        """Build a summary of current project's KB for context injection."""
+        proj = self.state.result.get("project", "") if self.state.result else ""
+        if not proj:
+            return ""
+        data = self.kb.load_project_data(proj)
+        parts = []
+        style = data.get("style_profile", {})
+        if style:
+            parts.append(f"文风: 对白占比{style.get('dialogue_ratio','?')}, 成语密度{style.get('idiom_density','?')}, 镜头模式{style.get('camera_sequence','')}")
+        chars = data.get("characters", [])[:15]
+        if chars:
+            parts.append("角色: " + ", ".join(c.get("name", "?") for c in chars))
+        world = data.get("world_settings", {})
+        if world and world.get("genre"):
+            parts.append(f"题材: {world['genre']}")
+        timeline = data.get("plot_timeline", [])
+        if timeline:
+            hooks = []
+            for t in timeline[-3:]:
+                if isinstance(t, dict) and t.get("hooks"):
+                    for h in t["hooks"][:3]:
+                        hooks.append(h.get("description", "")[:50])
+            if hooks:
+                parts.append("近期剧情: " + "; ".join(hooks))
+        return "\n".join(parts)
+
     async def run_titles(self, synopsis: str, genre: str) -> str:
+        kb = self._get_kb_summary()
+        if kb:
+            synopsis = f"[知识库参考]\n{kb}\n\n[概要]\n{synopsis}"
         return await generate_titles(self.client, synopsis, genre)
 
     async def run_chat(self, message: str, genre: str, kb_context: str = "", history: list[dict] = None) -> str:
@@ -172,23 +202,13 @@ class PipelineOrchestrator:
         self.client._fast_mode = True
         try:
             system = "你是一位经验丰富的网文编辑和创作顾问。你不是在写小说，而是在和作者讨论剧情、分析人物、提供建议。请用对话的语气回复，不要长篇大论。每次回复控制在300字以内。记住之前的对话内容。"
-            # Load style and world context from KB
-            proj = self.state.result.get("project", "") if self.state.result else ""
-            style_note = ""
-            if proj:
-                data = self.kb.load_project_data(proj)
-                style = data.get("style_profile", {})
-                if style:
-                    style_note = f"文风档案: 对白占比{style.get('dialogue_ratio','?')}, 成语密度{style.get('idiom_density','?')}, 镜头模式{style.get('camera_sequence','')}"
-                chars = data.get("characters", [])[:10]
-                if chars:
-                    kb_context = "当前作品角色: " + ", ".join(c.get("name", "?") for c in chars)
+            kb_text = self._get_kb_summary()
             user = f"题材: {genre}\n"
-            if style_note:
-                user += f"{style_note}\n"
+            if kb_text:
+                user += f"[知识库参考]\n{kb_text}\n\n"
             if kb_context:
                 user += f"{kb_context}\n"
-            user += f"\n作者提问: {message}"
+            user += f"作者提问: {message}"
             msgs = [{"role": "system", "content": system}]
             if history:
                 for h in history[-20:]:
@@ -201,6 +221,9 @@ class PipelineOrchestrator:
 
     async def run_inspiration(self, stuck_point: str) -> str:
         refs = self._get_related_references(stuck_point)
+        kb = self._get_kb_summary()
+        if kb:
+            stuck_point = f"[知识库参考]\n{kb}\n\n[卡文处]\n{stuck_point}"
         return await get_inspiration(self.client, stuck_point, refs)
 
     def _get_related_references(self, query: str) -> list[str]:
