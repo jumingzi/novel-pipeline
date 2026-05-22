@@ -102,6 +102,10 @@ class DeepSeekClient:
             "Content-Type": "application/json",
         }
 
+        # Debug: print what we're sending
+        msg_sizes = [len(m.get("content","")) for m in messages]
+        print(f"[API] {agent_id} thinking={cfg.get('thinking')} effort={cfg.get('reasoning_effort','')} msgs={msg_sizes} total={sum(msg_sizes)}chars", flush=True)
+
         last_error = None
         for attempt in range(MAX_RETRIES + 1):
             try:
@@ -117,6 +121,9 @@ class DeepSeekClient:
                             timeout=HTTP_TIMEOUT,
                         )
 
+                resp_len = len(resp.content) if hasattr(resp, 'content') else 0
+                print(f"[API] {agent_id} response HTTP {resp.status_code} len={resp_len} attempt={attempt}", flush=True)
+
                 if resp.status_code >= 500:
                     last_error = f"HTTP {resp.status_code}"
                     if attempt < MAX_RETRIES:
@@ -129,6 +136,7 @@ class DeepSeekClient:
                 if resp.status_code != 200:
                     data = resp.json()
                     err = data.get("error", {}).get("message", resp.text)
+                    print(f"[API] {agent_id} ERROR HTTP {resp.status_code}: {err}", flush=True)
                     raise RuntimeError(f"API returned HTTP {resp.status_code}: {err}")
 
                 data = resp.json()
@@ -167,6 +175,7 @@ class DeepSeekClient:
 
             except (httpx.TimeoutException, httpx.ConnectError) as e:
                 last_error = str(e)
+                print(f"[API] {agent_id} NETWORK ERROR (attempt {attempt+1}): {e}", flush=True)
                 if attempt < MAX_RETRIES:
                     await self._emit(agent_id, "running",
                         f"网络错误: {e}, 重试 {attempt+1}/{MAX_RETRIES}")
