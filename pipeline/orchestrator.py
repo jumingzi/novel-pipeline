@@ -1,4 +1,6 @@
 import asyncio
+import json
+import os
 import threading
 from dataclasses import dataclass, field
 
@@ -91,13 +93,30 @@ class PipelineOrchestrator:
             self._check_cancel()
 
             self.state.advance("agent2", "running")
-            decon_results = await deconstruct_all_chunks(self.client, chunks, on_progress=self._on_progress, cancel_check=lambda: self._check_cancel())
+            # Check for existing checkpoint
+            ckpt_path = os.path.join(self.kb._project_path(project), "_checkpoint.json")
+            if os.path.exists(ckpt_path):
+                print(f"[Orchestrator] 发现断点, 跳过Agent2直接归档: {project}", flush=True)
+                with open(ckpt_path, "r", encoding="utf-8") as f:
+                    decon_dicts = json.load(f)
+                from pipeline.agent2_deconstructor import DeconstructionResult
+                decon_results = [DeconstructionResult(**d) for d in decon_dicts]
+            else:
+                decon_results = await deconstruct_all_chunks(self.client, chunks, on_progress=self._on_progress, cancel_check=lambda: self._check_cancel())
+                # Save checkpoint
+                decon_dicts = [r.to_dict() if hasattr(r, 'to_dict') else r for r in decon_results]
+                os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
+                with open(ckpt_path, "w", encoding="utf-8") as f:
+                    json.dump(decon_dicts, f, ensure_ascii=False)
             self.state.advance("agent2", "done")
             self._check_cancel()
 
             self.state.advance("agent3", "running")
             genre = genre or "玄幻"
             kb_result = await update_knowledge_base(self.kb, self.rag, decon_results, genre, project=project)
+            # Remove checkpoint after successful Agent3
+            if os.path.exists(ckpt_path):
+                os.remove(ckpt_path)
             self.state.advance("agent3", "done")
 
             ref_style = ""
