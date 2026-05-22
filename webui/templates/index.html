@@ -28,6 +28,28 @@
       <div class="nav-items" id="projectListItems">
         <div class="nav-item" style="color:var(--ink-light);font-size:11px;">加载中...</div>
       </div>
+      <div class="nav-item" data-panel="create-project">
+        <span class="dot"></span> + 新建原创项目
+      </div>
+    </div>
+
+    <!-- 创作工具 Section -->
+    <div class="nav-section open" id="nav-section-create">
+      <div class="nav-section-header" data-section="create">
+        <span class="icon">🔧</span> 创作工具
+        <span class="arrow">▶</span>
+      </div>
+      <div class="nav-items">
+        <div class="nav-item" data-panel="outline-planner">
+          <span class="dot"></span> 大纲规划器
+        </div>
+        <div class="nav-item" data-panel="rel-graph">
+          <span class="dot"></span> 角色关系图
+        </div>
+        <div class="nav-item" data-panel="batch-gen">
+          <span class="dot"></span> 批量章节生成
+        </div>
+      </div>
     </div>
 
     <!-- 拆书 Section -->
@@ -270,6 +292,46 @@
       <textarea class="outline-input" id="inspireInput" placeholder="描述你卡文的地方，AI 分析知识库给出建议...&#10;&#10;例如：&#10;主角被三位元婴期修士围杀，怎么破局？"></textarea>
       <button class="btn btn-primary" onclick="getInspiration()">获取建议</button>
       <div id="inspireResults" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- === 新建原创项目 Panel === -->
+    <div class="tab-panel" id="panel-create-project">
+      <h3>新建原创项目</h3>
+      <div class="setting-row" style="margin-top:12px;"><label>书名</label><input class="outline-input" id="cpTitle" style="min-height:0;padding:8px;" placeholder="输入书名..."></div>
+      <div class="setting-row"><label>题材</label><select class="genre-select" id="cpGenre"><option>玄幻</option><option>仙侠</option><option>武侠</option><option>都市</option><option>轻小说</option><option>历史</option><option>科幻</option><option>奇幻</option><option>游戏</option><option>悬疑</option><option>恋爱</option></select></div>
+      <textarea class="outline-input" id="cpSynopsis" placeholder="故事概要（200字内）..." style="min-height:60px;"></textarea>
+      <textarea class="outline-input" id="cpChars" placeholder="主角名（逗号分隔多个）" style="min-height:0;padding:8px;"></textarea>
+      <div class="setting-row"><label>金手指</label><input class="outline-input" id="cpFinger" style="min-height:0;padding:8px;" placeholder="如: 随身老爷爷、属性面板、重生先知..."></div>
+      <button class="btn btn-primary" onclick="createProject()">创建项目</button>
+      <div id="cpResult" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- === 大纲规划器 Panel === -->
+    <div class="tab-panel" id="panel-outline-planner">
+      <h3>大纲规划器</h3>
+      <div class="setting-row" style="margin-top:12px;"><label>题材</label><select class="genre-select" id="planGenre"><option>玄幻</option><option>仙侠</option><option>武侠</option><option>都市</option><option>轻小说</option><option>历史</option><option>科幻</option><option>奇幻</option><option>游戏</option><option>悬疑</option><option>恋爱</option></select></div>
+      <textarea class="outline-input" id="planIdea" placeholder="输入大致想法...&#10;如: 主角被宗门逐出，意外获得上古传承，一步步复仇..." style="min-height:80px;"></textarea>
+      <button class="btn btn-primary" onclick="planOutline()">生成节拍表</button>
+      <div id="beatSheetResult" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- === 角色关系图 Panel === -->
+    <div class="tab-panel" id="panel-rel-graph">
+      <h3>角色关系图</h3>
+      <div class="setting-row" style="margin-top:8px;">
+        <select class="genre-select" id="relProject" style="flex:1;" onchange="loadRelGraph()"><option value="">选择项目</option></select>
+      </div>
+      <div id="relGraphCanvas" style="margin-top:16px;min-height:400px;border:1px solid var(--ink-line);border-radius:var(--radius);overflow:hidden;position:relative;background:var(--card-bg);"></div>
+    </div>
+
+    <!-- === 批量章节生成 Panel === -->
+    <div class="tab-panel" id="panel-batch-gen">
+      <h3>批量章节生成</h3>
+      <p style="font-size:13px;color:var(--ink-light);margin:8px 0;">在大纲规划器中生成节拍表后，点下方按钮批量生成所有章节。</p>
+      <div class="setting-row"><label>题材</label><select class="genre-select" id="batchGenre"><option>玄幻</option><option>仙侠</option><option>武侠</option><option>都市</option><option>轻小说</option><option>历史</option><option>科幻</option><option>奇幻</option><option>游戏</option><option>悬疑</option><option>恋爱</option></select></div>
+      <button class="btn btn-primary" onclick="startBatchGen()">批量生成</button>
+      <div id="batchProgress" style="margin:12px 0;font-size:12px;color:var(--ink-light);"></div>
+      <div id="batchResults" style="margin-top:12px;"></div>
     </div>
 
     <!-- === 对比分析 Panel === -->
@@ -673,23 +735,6 @@ async function runCompare() {
   } catch(e) { toast('对比失败'); }
 }
 
-// Add compare nav to the 知识库 section
-document.addEventListener('DOMContentLoaded', function() {
-  // Populate compare dropdowns when projects load
-  const origLoad = loadProjects;
-  loadProjects = async function() {
-    await origLoad();
-    // Populate compare selects
-    const selA = document.getElementById('compareProjA');
-    const selB = document.getElementById('compareProjB');
-    if (selA && selB) {
-      const opts = allProjects.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
-      selA.innerHTML = '<option value="">项目A</option>' + opts;
-      selB.innerHTML = '<option value="">项目B</option>' + opts;
-    }
-  };
-});
-
 // ============ SSE PROGRESS ============
 const agentLabels = ['文件处理', '拆书分析', '知识归档', 'AI写手'];
 let streamBuffer = '';
@@ -914,11 +959,178 @@ async function resumeTask(filePath, project, genre) {
   } catch(e) { toast('启动失败: ' + e.message); }
 }
 
+// ============ CREATE PROJECT ============
+async function createProject() {
+  const title = document.getElementById('cpTitle').value.trim();
+  if (!title) { toast('请输入书名'); return; }
+  const fd = new FormData();
+  fd.append('title', title);
+  fd.append('genre', document.getElementById('cpGenre').value);
+  fd.append('synopsis', document.getElementById('cpSynopsis').value);
+  fd.append('characters', document.getElementById('cpChars').value);
+  fd.append('golden_finger', document.getElementById('cpFinger').value);
+  try {
+    const res = await fetch('/api/create-project', { method: 'POST', body: fd });
+    await res.json();
+    toast('项目已创建: ' + title);
+    loadProjects();
+  } catch(e) { toast('创建失败'); }
+}
+
+// ============ OUTLINE PLANNER ============
+let currentBeats = [];
+async function planOutline() {
+  const idea = document.getElementById('planIdea').value.trim();
+  if (!idea) { toast('请输入想法'); return; }
+  document.getElementById('beatSheetResult').innerHTML = '<span class="spinner"></span> 规划中...';
+  const fd = new FormData();
+  fd.append('idea', idea);
+  fd.append('genre', document.getElementById('planGenre').value);
+  fd.append('project', currentProject || '');
+  try {
+    const res = await fetch('/api/plan-outline', { method: 'POST', body: fd });
+    const data = await res.json();
+    // Parse the JSON outline
+    const txt = data.outline || '[]';
+    const jsonStart = txt.indexOf('['), jsonEnd = txt.lastIndexOf(']') + 1;
+    const beats = JSON.parse(jsonStart >= 0 ? txt.substring(jsonStart, jsonEnd) : '[]');
+    currentBeats = beats;
+    renderBeats(beats);
+  } catch(e) {
+    document.getElementById('beatSheetResult').innerHTML = '<p>解析失败，请重试</p>';
+  }
+}
+
+function renderBeats(beats) {
+  let html = '<h4>节拍表 (' + beats.length + ' 个节拍)</h4>';
+  beats.forEach((b, i) => {
+    html += `<div class="kb-card" style="margin:8px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <strong>节拍${i+1}: ${escapeHtml(b.title||'')}</strong>
+        <button class="btn btn-sm" onclick="refineBeat(${i})">优化</button>
+      </div>
+      <p style="font-size:12px;color:var(--ink-mid);">${escapeHtml(b.plot||'')}</p>
+      <span style="font-size:11px;">爽点: ${escapeHtml(b.dopamine||'')} | 建议${b.words||1500}字</span>
+    </div>`;
+  });
+  html += '<button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="openPanel(\'batch-gen\')">用此节拍表批量生成 →</button>';
+  document.getElementById('beatSheetResult').innerHTML = html;
+}
+
+async function refineBeat(idx) {
+  const beat = JSON.stringify(currentBeats[idx]);
+  const feedback = prompt('优化建议（可选）:', '丰富细节，增加冲突');
+  if (!feedback) return;
+  const fd = new FormData();
+  fd.append('beat', beat);
+  fd.append('feedback', feedback);
+  fd.append('genre', document.getElementById('planGenre').value);
+  try {
+    const res = await fetch('/api/refine-beat', { method: 'POST', body: fd });
+    const data = await res.json();
+    const txt = data.beat || '{}';
+    const bStart = txt.indexOf('{'), bEnd = txt.lastIndexOf('}') + 1;
+    const refined = JSON.parse(bStart >= 0 ? txt.substring(bStart, bEnd) : '{}');
+    currentBeats[idx] = refined;
+    renderBeats(currentBeats);
+  } catch(e) { toast('优化失败'); }
+}
+
+// ============ BATCH GENERATION ============
+async function startBatchGen() {
+  if (!currentBeats.length) { toast('请先在大纲规划器中生成节拍表'); return; }
+  document.getElementById('batchProgress').innerHTML = '<span class="spinner"></span> 启动中...';
+  const fd = new FormData();
+  fd.append('beats', JSON.stringify(currentBeats));
+  fd.append('genre', document.getElementById('batchGenre').value);
+  fd.append('project', currentProject || '');
+  try {
+    const res = await fetch('/api/batch-generate', { method: 'POST', body: fd });
+    await res.json();
+    toast('批量生成已启动');
+    pollBatchState();
+  } catch(e) { toast('启动失败'); }
+}
+
+function pollBatchState() {
+  const interval = setInterval(async () => {
+    try {
+      const res = await fetch('/api/batch-state');
+      const data = await res.json();
+      document.getElementById('batchProgress').innerHTML = `进度: ${data.current}/${data.total} 章`;
+      if (data.chapters?.length) {
+        document.getElementById('batchResults').innerHTML = data.chapters.map(c =>
+          `<div class="message ai" style="margin:8px 0;"><strong>${escapeHtml(c.title)}</strong><div class="msg-content" style="max-height:200px;overflow-y:auto;">${escapeHtml(c.content||'')}</div><div class="msg-actions"><button class="btn btn-sm" onclick="adoptChapter(this)">采纳</button></div></div>`
+        ).join('');
+      }
+      if (data.current >= data.total) { clearInterval(interval); }
+    } catch(e) { clearInterval(interval); }
+  }, 3000);
+}
+
+// ============ RELATIONSHIP GRAPH ============
+function loadRelGraph() {
+  const proj = document.getElementById('relProject').value;
+  if (!proj) return;
+  fetch('/api/relationships/' + encodeURIComponent(proj))
+    .then(r => r.json())
+    .then(data => renderRelGraph(data))
+    .catch(() => {});
+}
+
+function renderRelGraph(data) {
+  const canvas = document.getElementById('relGraphCanvas');
+  const chars = data.characters || [];
+  const rels = data.relationships || [];
+  if (!chars.length) { canvas.innerHTML = '<div class="empty-state"><p>该项目暂无角色数据</p></div>'; return; }
+
+  // Simple visualization: nodes + lines
+  const w = canvas.clientWidth || 700;
+  const cx = w / 2, cy = 200;
+  const radius = Math.min(180, chars.length * 25);
+  let html = '<div style="position:relative;width:100%;height:400px;">';
+
+  // Place characters in a circle
+  chars.forEach((c, i) => {
+    const angle = (2 * Math.PI * i) / chars.length - Math.PI / 2;
+    const x = cx + radius * Math.cos(angle) - 40;
+    const y = cy + radius * Math.sin(angle) - 20;
+    html += `<div style="position:absolute;left:${x}px;top:${y}px;padding:6px 12px;background:var(--card-bg);border:2px solid var(--cinnabar);border-radius:20px;font-size:12px;font-weight:600;z-index:2;">${escapeHtml(c.name)}</div>`;
+  });
+
+  // Show relationships
+  rels.forEach(r => {
+    html += `<div style="padding:6px 12px;margin:2px 0;font-size:11px;color:var(--ink-mid);border-left:2px solid var(--ink-line);">${escapeHtml(r.description||'')}</div>`;
+  });
+
+  html += '</div>';
+  canvas.innerHTML = html;
+}
+
+// Populate relationship project selector and compare selectors
+function populateSelectors() {
+  const relSel = document.getElementById('relProject');
+  const compA = document.getElementById('compareProjA');
+  const compB = document.getElementById('compareProjB');
+  const opts = allProjects.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+  if (relSel) relSel.innerHTML = '<option value="">选择项目</option>' + opts;
+  if (compA) compA.innerHTML = '<option value="">项目A</option>' + opts;
+  if (compB) compB.innerHTML = '<option value="">项目B</option>' + opts;
+}
+
+// Override loadProjects to populate selectors
+const _origLoadProjects = loadProjects;
+loadProjects = async function() {
+  await _origLoadProjects();
+  populateSelectors();
+};
+
 // Initial fetch on load
 checkIncompleteTasks();
 loadProjects();
 fetchState();
 setInterval(fetchState, 4000);
+setInterval(() => { if (document.getElementById('relProject')?.value) loadRelGraph(); }, 10000);
 
 // --- Render deconstruct results ---
 function renderDeconstructResults(deconResults) {

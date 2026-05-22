@@ -238,6 +238,34 @@ class PipelineOrchestrator:
             daemon=True)
         self._thread.start()
 
+    async def run_batch(self):
+        """Generate multiple chapters from beat sheet, chaining hooks."""
+        beats = getattr(self, '_batch_beats', [])
+        genre = getattr(self, '_batch_genre', '玄幻')
+        project = getattr(self, '_batch_project', '')
+        chapters = []
+        prev_hook = ""
+        for i, beat in enumerate(beats):
+            self._check_cancel()
+            outline = beat.get("plot", str(beat))
+            if prev_hook:
+                outline = f"[上一章结尾钩子: {prev_hook}]\n\n{outline}"
+            await self._on_progress({"agent_id": "agent4", "status": "running", "message": f"生成第{i+1}/{len(beats)}章"})
+            chapter = await self.run_chapter(outline, genre, word_count=beat.get("words", 1500), project=project)
+            chapters.append({"chapter": i+1, "title": beat.get("title", f"第{i+1}章"), "content": chapter})
+            self._batch_index = i + 1
+            self._batch_chapters = chapters
+            # Extract last 100 chars as hook for next chapter
+            prev_hook = chapter[-200:] if len(chapter) > 200 else chapter[-50:]
+        self.state.result["batch_chapters"] = chapters
+        await self._on_progress({"agent_id": "agent4", "status": "done", "message": f"批量生成完成: {len(chapters)}章"})
+
+    def start_batch_background(self):
+        self._thread = threading.Thread(
+            target=lambda: asyncio.run(self.run_batch()),
+            daemon=True)
+        self._thread.start()
+
     def start_chapter_background(self, outline: str, genre: str, word_count: int = 3000, reference_style: str = ""):
         proj = self.state.result.get("project", "") if self.state.result else ""
         self._thread = threading.Thread(

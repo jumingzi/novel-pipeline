@@ -222,6 +222,124 @@ async def compare_projects(a: str = "", b: str = ""):
     return JSONResponse(result)
 
 
+@app.post("/api/create-project")
+async def create_project(
+    title: str = Form(...),
+    genre: str = Form("玄幻"),
+    synopsis: str = Form(""),
+    characters: str = Form(""),
+    golden_finger: str = Form(""),
+):
+    """Create a new original project from scratch."""
+    orch = get_orchestrator()
+    project = title or "未命名项目"
+    data = {
+        "characters": [],
+        "plot_timeline": [],
+        "world_settings": {"genre": genre, "synopsis": synopsis, "golden_finger": golden_finger, "title": project},
+        "style_profile": {},
+    }
+    if characters:
+        for c_name in [x.strip() for x in characters.split(",") if x.strip()]:
+            data["characters"].append({"name": c_name, "explicit_traits": "", "hidden_motivation": "", "core_conflict": ""})
+    orch.kb.save_project_data(project, data)
+    return JSONResponse({"status": "created", "project": project})
+
+
+@app.post("/api/plan-outline")
+async def plan_outline(
+    idea: str = Form(...),
+    genre: str = Form("玄幻"),
+    project: str = Form(""),
+):
+    """Generate a beat sheet from a story idea, using KB context."""
+    orch = get_orchestrator()
+    # Get KB summary for context
+    kb_text = ""
+    if project:
+        data = orch.kb.load_project_data(project)
+        chars = data.get("characters", [])[:10]
+        style = data.get("style_profile", {})
+        if chars:
+            kb_text = "角色: " + ", ".join(c.get("name","?") for c in chars)
+        if style:
+            kb_text += f"\n文风: 对白{style.get('dialogue_ratio','?')}, 句长{style.get('avg_sentence_length','?')}"
+    msgs = [
+        {"role": "system", "content": "你是资深网文大纲规划师。把用户的想法展开为6-8个节拍的章节细纲（起承转合结构）。每个节拍包含：节拍标题、一句话剧情、预期爽点类型、字数建议。输出为JSON数组 [{beat:1, title:'', plot:'', dopamine:'', words:1500},...]。"},
+        {"role": "user", "content": f"题材: {genre}\n{kb_text}\n\n想法: {idea}\n\n请生成节拍表，只输出JSON数组。"},
+    ]
+    reply = await orch.client.call("agent3", msgs)
+    return JSONResponse({"outline": reply})
+
+
+@app.post("/api/refine-beat")
+async def refine_beat(
+    beat: str = Form(...),
+    feedback: str = Form(""),
+    genre: str = Form("玄幻"),
+):
+    """Refine a single beat based on feedback."""
+    orch = get_orchestrator()
+    msgs = [
+        {"role": "system", "content": "你是专业网文编辑。根据反馈优化这一节拍的内容，只输出优化后的JSON：{beat:N, title:'', plot:'', dopamine:'', words:1500}"},
+        {"role": "user", "content": f"原始节拍: {beat}\n反馈: {feedback}\n题材: {genre}"},
+    ]
+    reply = await orch.client.call("agent3", msgs)
+    return JSONResponse({"beat": reply})
+
+
+@app.post("/api/batch-generate")
+async def batch_generate(
+    beats: str = Form(...),
+    genre: str = Form("玄幻"),
+    project: str = Form(""),
+):
+    """Generate multiple chapters from a beat sheet."""
+    orch = get_orchestrator()
+    try:
+        beats_list = json.loads(beats)
+    except Exception:
+        raise HTTPException(400, "Invalid beat sheet JSON")
+    orch._batch_beats = beats_list
+    orch._batch_genre = genre
+    orch._batch_project = project or genre
+    orch._batch_index = 0
+    orch._batch_chapters = []
+    orch.start_batch_background()
+    return JSONResponse({"status": "started", "total": len(beats_list)})
+
+
+@app.get("/api/batch-state")
+async def batch_state():
+    orch = get_orchestrator()
+    return JSONResponse({
+        "current": getattr(orch, '_batch_index', 0),
+        "total": len(getattr(orch, '_batch_beats', [])),
+        "chapters": getattr(orch, '_batch_chapters', []),
+    })
+
+
+@app.get("/api/relationships/{project}")
+async def get_relationships(project: str):
+    """Get character relationships for visualization."""
+    orch = get_orchestrator()
+    data = orch.kb.load_project_data(project)
+    chars = data.get("characters", [])
+    # Extract relationships from plot_timeline hooks
+    relationships = []
+    timeline = data.get("plot_timeline", [])
+    for t in timeline:
+        if isinstance(t, dict) and t.get("hooks"):
+            for h in t.get("hooks", []):
+                rel = h.get("description", "")
+                if any(kw in rel for kw in ["敌", "仇", "杀", "恩", "爱", "师徒", "兄弟", "姐妹", "父子", "母女"]):
+                    relationships.append({"type": "hook", "description": rel[:100], "score": h.get("score", 5)})
+    return JSONResponse({
+        "characters": [{"name": c.get("name", "?"), "traits": c.get("explicit_traits", "")[:80]} for c in chars[:20]],
+        "relationships": relationships[:30],
+    })
+
+
 @app.get("/api/checkpoints")
 async def get_checkpoints():
     """Scan knowledge_base for incomplete analyses (_checkpoint.json)."""
