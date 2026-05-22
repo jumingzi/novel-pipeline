@@ -110,6 +110,7 @@ async def deconstruct_all_chunks(
 
     # Process in parallel batches
     for batch_start in range(0, total, parallel):
+        batch_end = min(batch_start + parallel, total)
         if cancel_check:
             cancel_check()
 
