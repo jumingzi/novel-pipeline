@@ -74,6 +74,9 @@
         <div class="nav-item" data-panel="kb-style">
           <span class="dot"></span> 文风档案
         </div>
+        <div class="nav-item" data-panel="compare">
+          <span class="dot"></span> 对比分析
+        </div>
       </div>
     </div>
 
@@ -269,8 +272,24 @@
       <div id="inspireResults" style="margin-top:16px;"></div>
     </div>
 
+    <!-- === 对比分析 Panel === -->
+    <div class="tab-panel" id="panel-compare">
+      <h3>对比分析</h3>
+      <p style="font-size:13px;color:var(--ink-light);margin:8px 0 16px;">选择两个项目，对比文风差异</p>
+      <div style="display:flex;gap:16px;margin-bottom:12px;">
+        <select class="genre-select" id="compareProjA" style="flex:1;"><option value="">项目A</option></select>
+        <select class="genre-select" id="compareProjB" style="flex:1;"><option value="">项目B</option></select>
+        <button class="btn btn-primary btn-sm" onclick="runCompare()">对比</button>
+      </div>
+      <div id="compareResults"></div>
+    </div>
+
     <div class="tab-panel" id="panel-generate-writer">
       <div class="chat-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <h3 style="margin:0;">AI写手对话</h3>
+          <button class="btn btn-sm" onclick="clearChat()">清空对话</button>
+        </div>
         <div class="chat-messages" id="chatMessages">
           <div class="empty-state"><p>这里是你的专属网文编辑助手。<br>可以讨论剧情走向、人物设定、爽点设计, 也可以直接问「主角被围杀怎么破局」。</p></div>
         </div>
@@ -578,7 +597,7 @@ async function sendChat() {
   fd.append('message', text);
   fd.append('genre', document.getElementById('genGenreSelect').value);
   // Send last 20 messages as conversation history
-  fd.append('history', JSON.stringify(chatHistory.slice(-20)));
+  fd.append('history', JSON.stringify(chatHistory.slice(-50)));
 
   try {
     const controller = new AbortController();
@@ -602,12 +621,74 @@ async function sendChat() {
   }
 }
 
-function adoptChapter(btn) {
+let savedChaptersCount = 0;
+
+async function adoptChapter(btn) {
   const content = btn.parentElement.previousElementSibling.textContent;
-  const chNum = savedChapters.length + 1;
+  savedChaptersCount++;
+  const chNum = savedChaptersCount;
   savedChapters.push({ chapter: chNum, content, time: new Date().toLocaleTimeString() });
-  toast(`第${chNum}章已保存到知识库`);
+  // Save to server
+  try {
+    const fd = new FormData();
+    fd.append('content', content);
+    fd.append('chapter_num', chNum);
+    fd.append('project', currentProject || '');
+    await fetch('/api/save-chapter', { method: 'POST', body: fd });
+  } catch(e) {}
+  renderKBPanels(null, '');
+  toast(`第${chNum}章已保存`);
 }
+
+function clearChat() {
+  chatHistory = [];
+  document.getElementById('chatMessages').innerHTML = '<div class="empty-state"><p>对话已清空。<br>可以开始新的讨论。</p></div>';
+  toast('对话已清空');
+}
+
+async function runCompare() {
+  const a = document.getElementById('compareProjA').value;
+  const b = document.getElementById('compareProjB').value;
+  if (!a || !b) { toast('请选择两个项目'); return; }
+  try {
+    const res = await fetch(`/api/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
+    const data = await res.json();
+    const sa = data[a]?.style || {};
+    const sb = data[b]?.style || {};
+    let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;">';
+    html += `<div class="kb-card"><h4>${escapeHtml(a)}</h4>
+      <p>角色数: ${data[a]?.character_count||0}</p>
+      <p>对白占比: ${sa.dialogue_ratio||'?'}</p>
+      <p>成语密度: ${sa.idiom_density||'?'}</p>
+      <p>平均句长: ${sa.avg_sentence_length||'?'}</p>
+      <p>镜头模式: ${escapeHtml(sa.camera_sequence||'')}</p></div>`;
+    html += `<div class="kb-card"><h4>${escapeHtml(b)}</h4>
+      <p>角色数: ${data[b]?.character_count||0}</p>
+      <p>对白占比: ${sb.dialogue_ratio||'?'}</p>
+      <p>成语密度: ${sb.idiom_density||'?'}</p>
+      <p>平均句长: ${sb.avg_sentence_length||'?'}</p>
+      <p>镜头模式: ${escapeHtml(sb.camera_sequence||'')}</p></div>`;
+    html += '</div>';
+    document.getElementById('compareResults').innerHTML = html;
+  } catch(e) { toast('对比失败'); }
+}
+
+// Add compare nav to the 知识库 section
+document.addEventListener('DOMContentLoaded', function() {
+  // Populate compare dropdowns when projects load
+  const origLoad = loadProjects;
+  loadProjects = async function() {
+    await origLoad();
+    // Populate compare selects
+    const selA = document.getElementById('compareProjA');
+    const selB = document.getElementById('compareProjB');
+    if (selA && selB) {
+      const opts = allProjects.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+      selA.innerHTML = '<option value="">项目A</option>' + opts;
+      selB.innerHTML = '<option value="">项目B</option>' + opts;
+    }
+  };
+});
 
 // ============ SSE PROGRESS ============
 const agentLabels = ['文件处理', '拆书分析', '知识归档', 'AI写手'];
@@ -884,25 +965,39 @@ function renderDeconstructResults(deconResults) {
     charPanel.innerHTML = html;
   }
 
-  // 剧情分析
+  // 剧情分析 with timeline visualization
   const plotPanel = document.getElementById('panel-deconstruct-plot');
   if (plotPanel) {
     let html = '<h3>剧情分析</h3>';
-    if (allHooks.length === 0) {
-      html += '<div class="empty-state"><p>未检测到明确钩子</p></div>';
+    // Timeline visualization
+    if (allHooks.length > 0 || allForeshadowing.planted.length > 0) {
+      html += '<div class="timeline">';
+      // Hooks
+      allHooks.forEach((h, i) => {
+        const scoreColor = h.score >= 8 ? 'var(--cinnabar)' : h.score >= 5 ? '#b8860b' : 'var(--ink-mid)';
+        html += `<div class="timeline-item" style="border-left:3px solid ${scoreColor};padding:8px 12px;margin:6px 0;background:var(--card-bg);">
+          <span style="font-weight:600;">[${escapeHtml(h.type||'?')}]</span>
+          <span style="color:${scoreColor};float:right;">${'★'.repeat(Math.round((h.score||0)/2))}${'☆'.repeat(5-Math.round((h.score||0)/2))} ${h.score||0}/10</span>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--ink-mid);">${escapeHtml(h.description||'')}</p>
+        </div>`;
+      });
+      // Foreshadowing timeline
+      allForeshadowing.planted.forEach((f, i) => {
+        html += `<div class="timeline-item" style="border-left:3px solid #7b68ee;padding:8px 12px;margin:6px 0;background:var(--card-bg);">
+          <span style="font-weight:600;color:#7b68ee;">埋笔 ${i+1}</span>
+          <span style="font-size:10px;color:var(--ink-light);float:right;">置信度 ${Math.round((f.confidence||0.5)*100)}%</span>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--ink-mid);">${escapeHtml(f.description||'?')}</p>
+        </div>`;
+      });
+      allForeshadowing.resolved.forEach(f => {
+        html += `<div class="timeline-item" style="border-left:3px solid #228b22;padding:8px 12px;margin:6px 0;background:var(--card-bg);">
+          <span style="font-weight:600;color:#228b22;">回收</span>
+          <p style="margin:4px 0 0;font-size:12px;color:var(--ink-mid);">${escapeHtml(f.description||'?')}</p>
+        </div>`;
+      });
+      html += '</div>';
     } else {
-      html += allHooks.map(h => `<div class="char-card">
-        [${escapeHtml(h.type||'')}] 评分:${h.score||'?'}/10 — ${escapeHtml(h.description||'')}
-      </div>`).join('');
-    }
-    // Foreshadowing
-    if (allForeshadowing.planted.length > 0) {
-      html += '<h3>已埋伏笔</h3>';
-      html += allForeshadowing.planted.map(f => `<div class="char-card">${escapeHtml(f.description||'')} (置信度:${f.confidence||'?'})</div>`).join('');
-    }
-    if (allForeshadowing.resolved.length > 0) {
-      html += '<h3>已回收伏笔</h3>';
-      html += allForeshadowing.resolved.map(f => `<div class="char-card">${escapeHtml(f.description||'')}</div>`).join('');
+      html += '<div class="empty-state"><p>未检测到明确钩子或伏笔</p></div>';
     }
     plotPanel.innerHTML = html;
   }
@@ -1004,10 +1099,18 @@ function renderKBPanels(kbData, genre) {
     const tPanel = document.getElementById('panel-kb-timeline');
     if (tPanel) {
       tPanel.innerHTML += '<h3>已保存章节</h3>' + savedChapters.map(c =>
-        `<div class="chapter-list-item" onclick="openPanel(\'generate-writer\')">第${c.chapter}章 — ${c.time}</div>`
+        `<div class="chapter-list-item" onclick="openPanel(\'generate-outline\')">第${c.chapter}章 — ${c.time}</div>`
       ).join('');
+      // Add export button
+      tPanel.innerHTML += `<button class="btn btn-sm" style="margin-top:8px;" onclick="exportProject()">导出项目</button>`;
     }
   }
+}
+
+function exportProject() {
+  if (!currentProject) { toast('请先选择项目'); return; }
+  window.open('/api/export/' + encodeURIComponent(currentProject), '_blank');
+}
 }
 
 // --- Chapter display ---

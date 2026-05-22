@@ -211,7 +211,7 @@ class PipelineOrchestrator:
             user += f"作者提问: {message}"
             msgs = [{"role": "system", "content": system}]
             if history:
-                for h in history[-20:]:
+                for h in history[-50:]:
                     msgs.append(h)
             msgs.append({"role": "user", "content": user})
             reply = await self.client.call("agent4", msgs)

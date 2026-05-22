@@ -171,6 +171,57 @@ async def stop_pipeline():
     return JSONResponse({"status": "cancelled"})
 
 
+@app.post("/api/save-chapter")
+async def save_chapter(
+    content: str = Form(...),
+    chapter_num: int = Form(0),
+    project: str = Form(""),
+):
+    """Save an adopted chapter to the project directory."""
+    orch = get_orchestrator()
+    proj = project or (orch.state.result.get("project", "") if orch.state.result else "")
+    if not proj:
+        raise HTTPException(400, "No project selected")
+    chapters_dir = os.path.join(orch.kb._project_path(proj), "chapters")
+    os.makedirs(chapters_dir, exist_ok=True)
+    num = chapter_num or len(os.listdir(chapters_dir)) + 1
+    fname = f"chapter_{num:03d}.txt"
+    with open(os.path.join(chapters_dir, fname), "w", encoding="utf-8") as f:
+        f.write(content)
+    return JSONResponse({"chapter": num, "filename": fname})
+
+
+@app.get("/api/export/{project}")
+async def export_project(project: str):
+    """Export all project data as JSON."""
+    orch = get_orchestrator()
+    data = orch.kb.load_project_data(project)
+    chapters_dir = os.path.join(orch.kb._project_path(project), "chapters")
+    if os.path.exists(chapters_dir):
+        chapters = {}
+        for f in sorted(os.listdir(chapters_dir)):
+            with open(os.path.join(chapters_dir, f), "r", encoding="utf-8") as cf:
+                chapters[f] = cf.read()
+        data["chapters"] = chapters
+    return JSONResponse(data)
+
+
+@app.get("/api/compare")
+async def compare_projects(a: str = "", b: str = ""):
+    """Compare two projects' style profiles."""
+    orch = get_orchestrator()
+    result = {}
+    for proj in [a, b]:
+        if proj:
+            d = orch.kb.load_project_data(proj)
+            result[proj] = {
+                "style": d.get("style_profile", {}),
+                "character_count": len(d.get("characters", [])),
+                "genre": d.get("world_settings", {}).get("genre", ""),
+            }
+    return JSONResponse(result)
+
+
 @app.get("/api/checkpoints")
 async def get_checkpoints():
     """Scan knowledge_base for incomplete analyses (_checkpoint.json)."""
