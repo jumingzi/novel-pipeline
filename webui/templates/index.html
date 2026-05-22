@@ -464,6 +464,7 @@ async function startAnalyze() {
   fd.append('start_chapter', document.getElementById('chStart').value || '0');
   fd.append('end_chapter', document.getElementById('chEnd').value || '0');
   fd.append('fast_mode', document.getElementById('fastToggle').classList.contains('on'));
+  fd.append('project', sourceFileName || '');
 
   try {
     const res = await fetch('/api/analyze', { method: 'POST', body: fd });
@@ -704,16 +705,21 @@ function renderProjectList() {
     return;
   }
   container.innerHTML = allProjects.map(p =>
-    `<div class="nav-item${p === currentProject ? ' active' : ''}" onclick="selectProject('${escapeHtml(p)}')">
+    `<div class="nav-item${p === currentProject ? ' active' : ''}" data-project="${escapeHtml(p)}">
       <span class="dot"></span> ${escapeHtml(p)}
     </div>`
   ).join('');
+  // Use event delegation
+  container.querySelectorAll('.nav-item[data-project]').forEach(el => {
+    el.addEventListener('click', function() {
+      selectProject(this.dataset.project);
+    });
+  });
 }
 
 async function selectProject(projectName) {
   currentProject = projectName;
   renderProjectList();
-  // Load project data from KB
   try {
     const res = await fetch('/api/state?project=' + encodeURIComponent(projectName));
     const data = await res.json();
