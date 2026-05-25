@@ -1343,7 +1343,6 @@ function exportProject() {
   if (!currentProject) { toast('请先选择项目'); return; }
   window.open('/api/export/' + encodeURIComponent(currentProject), '_blank');
 }
-}
 
 // --- Chapter display ---
 let lastChapter = '';
