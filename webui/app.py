@@ -340,6 +340,104 @@ async def get_relationships(project: str):
     })
 
 
+@app.post("/api/regenerate")
+async def regenerate_chapter(
+    outline: str = Form(...),
+    genre: str = Form("玄幻"),
+    word_count: int = Form(1500),
+    reference_style: str = Form(""),
+    project: str = Form(""),
+):
+    """Regenerate chapter with same prompt, different seed."""
+    orch = get_orchestrator()
+    orch.start_chapter_background(outline, genre, word_count, reference_style, project)
+    return JSONResponse({"status": "started"})
+
+
+@app.post("/api/save-version")
+async def save_version(
+    content: str = Form(...),
+    chapter_num: int = Form(0),
+    project: str = Form(""),
+):
+    """Save a chapter version for version history."""
+    orch = get_orchestrator()
+    proj = project or (orch.state.result.get("project", "") if orch.state.result else "")
+    if not proj: raise HTTPException(400, "No project")
+    versions_dir = os.path.join(orch.kb._project_path(proj), "versions")
+    os.makedirs(versions_dir, exist_ok=True)
+    num = chapter_num or 1
+    ts = str(int(__import__("time").time()))
+    fname = f"ch{num:03d}_v{ts}.txt"
+    with open(os.path.join(versions_dir, fname), "w", encoding="utf-8") as f:
+        f.write(content)
+    return JSONResponse({"filename": fname})
+
+
+@app.get("/api/versions/{project}")
+async def list_versions(project: str):
+    """List saved chapter versions."""
+    orch = get_orchestrator()
+    versions_dir = os.path.join(orch.kb._project_path(project), "versions")
+    result = []
+    if os.path.exists(versions_dir):
+        for f in sorted(os.listdir(versions_dir), reverse=True):
+            with open(os.path.join(versions_dir, f), "r", encoding="utf-8") as cf:
+                result.append({"filename": f, "content": cf.read()[:500]})
+    return JSONResponse({"versions": result})
+
+
+@app.get("/api/stats/{project}")
+async def project_stats(project: str):
+    """Get project statistics for dashboard."""
+    orch = get_orchestrator()
+    data = orch.kb.load_project_data(project)
+    chars = data.get("characters", [])
+    timeline = data.get("plot_timeline", [])
+    style = data.get("style_profile", {})
+    # Count hooks and dopamine by chapter
+    hook_types = {}
+    for t in timeline:
+        if isinstance(t, dict) and t.get("hooks"):
+            for h in t.get("hooks", []):
+                tp = h.get("type", "其他")
+                hook_types[tp] = hook_types.get(tp, 0) + 1
+    chapters_dir = os.path.join(orch.kb._project_path(project), "chapters")
+    chapter_count = len(os.listdir(chapters_dir)) if os.path.exists(chapters_dir) else 0
+    return JSONResponse({
+        "character_count": len(chars),
+        "chapter_count": chapter_count,
+        "style": style,
+        "hook_distribution": hook_types,
+    })
+
+
+@app.post("/api/consistency-check")
+async def consistency_check(
+    chapter: str = Form(...),
+    project: str = Form(""),
+):
+    """Check character consistency in generated chapter."""
+    orch = get_orchestrator()
+    data = {}
+    if project:
+        data = orch.kb.load_project_data(project)
+    chars = data.get("characters", [])[:10]
+    char_names = [c.get("name", "") for c in chars if c.get("name")]
+    issues = []
+    for name in char_names:
+        if name and name not in chapter:
+            issues.append(f"角色「{name}」未在本章出现")
+    # Check word repetition
+    words = chapter.replace("\n", "").replace(" ", "")
+    from collections import Counter
+    word_counts = Counter(words)
+    for w, c in word_counts.most_common(20):
+        if len(w) == 1 and c > 100:
+            issues.append(f"「{w}」出现{c}次，可能过于频繁")
+    return JSONResponse({"issues": issues, "verdict": "通过" if not issues else "发现问题"})
+
+
 @app.get("/api/checkpoints")
 async def get_checkpoints():
     """Scan knowledge_base for incomplete analyses (_checkpoint.json)."""

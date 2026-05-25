@@ -57,6 +57,13 @@ class DeepSeekClient:
         self.api_key = api_key or load_api_key()
         self.progress_callback = progress_callback
         self._fast_mode = False
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
+
+    def reset_cancel(self):
+        self._cancelled = False
 
     async def _emit(self, agent_id: str, status: str, message: str = ""):
         if self.progress_callback:
@@ -109,6 +116,8 @@ class DeepSeekClient:
 
         last_error = None
         for attempt in range(MAX_RETRIES + 1):
+            if self._cancelled:
+                raise RuntimeError("cancelled")
             try:
                 if _client:
                     resp = await _client.post(

@@ -12,6 +12,7 @@
 
 <!-- ============ SIDEBAR ============ -->
 <aside class="sidebar" id="sidebar">
+  <div class="resize-handle" id="resizeHandle"></div>
 
   <div class="sidebar-header">
     <h1>小说矩阵工坊<span class="stamp">墨</span></h1>
@@ -170,13 +171,26 @@
     <!-- Welcome Tab -->
     <div class="tab-panel active welcome-panel" id="panel-welcome">
       <div class="seal">墨</div>
-      <p>从左侧选择一个功能开始。<br>拆解小说、查阅知识库、或生成新章节。</p>
-      <div class="progress-row" style="margin-top:24px;justify-content:center;flex-wrap:wrap;gap:8px;">
-        <div class="progress-dots" id="progressDots">
-          <span class="progress-dot" title="文件处理"></span>
-          <span class="progress-dot" title="拆书分析"></span>
-          <span class="progress-dot" title="知识归档"></span>
-          <span class="progress-dot" title="AI写手"></span>
+      <p style="margin-bottom:16px;">小说矩阵工坊 · 自动化创作流水线</p>
+      <div id="welcomeQuickLinks" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:16px;">
+        <button class="btn btn-sm" onclick="openPanel('create-project')">+ 新建项目</button>
+        <button class="btn btn-sm" onclick="openPanel('deconstruct-source')">📖 拆解小说</button>
+        <button class="btn btn-sm" onclick="openPanel('outline-planner')">📋 大纲规划</button>
+        <button class="btn btn-sm" onclick="openPanel('generate-writer')">💬 编辑对话</button>
+      </div>
+      <div id="welcomeProjects" style="max-width:400px;margin:0 auto;">
+        <p style="font-size:12px;color:var(--ink-light);margin-bottom:8px;">最近项目</p>
+        <div id="welcomeProjectList" style="text-align:left;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:24px;justify-content:center;flex-wrap:wrap;">
+        <div class="step-bar" id="stepBar">
+          <div class="step-item" data-step="agent1"><div class="step-dot"></div><span>文件处理</span></div>
+          <div class="step-line"></div>
+          <div class="step-item" data-step="agent2"><div class="step-dot"></div><span>拆书分析</span></div>
+          <div class="step-line"></div>
+          <div class="step-item" data-step="agent3"><div class="step-dot"></div><span>知识归档</span></div>
+          <div class="step-line"></div>
+          <div class="step-item" data-step="agent4"><div class="step-dot"></div><span>AI写手</span></div>
         </div>
         <button class="btn btn-sm" id="stopBtn" onclick="stopPipeline()" style="display:none;color:var(--cinnabar);border-color:var(--cinnabar);">停止</button>
       </div>
@@ -367,6 +381,12 @@
 </div><!-- /main-content -->
 
 </div><!-- /app -->
+
+<!-- Floating elements -->
+<div class="dark-toggle" id="darkToggle" onclick="toggleDarkMode()" title="深色模式">🌙</div>
+<div class="notif-bell" id="notifBell" onclick="toggleNotifications()" title="通知">🔔<span class="badge" id="notifBadge" style="display:none;">0</span></div>
+<div class="notif-dropdown" id="notifDropdown"></div>
+<div class="word-count-badge" id="wordCountBadge" style="display:none;">字数: 0</div>
 
 <script>
 // ============ APP STATE ============
@@ -1388,8 +1408,191 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ============ DARK MODE ============
+function toggleDarkMode() {
+  const btn = document.getElementById('darkToggle');
+  document.body.classList.toggle('dark');
+  btn.textContent = document.body.classList.contains('dark') ? '☀' : '🌙';
+  localStorage.setItem('darkMode', document.body.classList.contains('dark') ? '1' : '0');
+}
+if (localStorage.getItem('darkMode') === '1') {
+  document.body.classList.add('dark');
+  document.getElementById('darkToggle').textContent = '☀';
+}
+
+// ============ NOTIFICATIONS ============
+let notifCount = 0;
+let notifList = [];
+function addNotification(msg, type) {
+  notifCount++;
+  notifList.unshift({ msg, type, time: new Date().toLocaleTimeString(), read: false });
+  document.getElementById('notifBadge').textContent = notifCount;
+  document.getElementById('notifBadge').style.display = 'flex';
+}
+function toggleNotifications() {
+  const dd = document.getElementById('notifDropdown');
+  dd.classList.toggle('open');
+  notifCount = 0;
+  document.getElementById('notifBadge').style.display = 'none';
+  notifList.forEach(n => n.read = true);
+  dd.innerHTML = notifList.length ? notifList.map(n =>
+    `<div class="notif-item"><strong>${escapeHtml(n.msg)}</strong><br><span style="font-size:10px;color:var(--ink-light);">${n.time}</span></div>`
+  ).join('') : '<div class="notif-item">暂无通知</div>';
+}
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.notif-bell') && !e.target.closest('.notif-dropdown')) {
+    document.getElementById('notifDropdown').classList.remove('open');
+  }
+});
+
+// ============ STEP BAR UPDATES ============
+const _origUpdateProgress = updateProgress;
+updateProgress = function(agentId, status, message) {
+  const agentMap = { agent1: 0, agent2: 1, agent3: 2, agent4: 3 };
+  const steps = document.querySelectorAll('#stepBar .step-item');
+  const idx = agentMap[agentId];
+  if (idx === undefined) return;
+  steps.forEach(s => { s.classList.remove('running', 'done'); });
+  for (let i = 0; i < idx; i++) steps[i].classList.add('done');
+  if (status === 'running') steps[idx].classList.add('running');
+  else if (status === 'done') steps[idx].classList.add('done');
+  if (message?.length && message.length < 80) {
+    steps[idx].querySelector('span').textContent = message;
+  }
+};
+
+// ============ WELCOME PROJECTS ============
+function updateWelcomeProjects() {
+  const list = document.getElementById('welcomeProjectList');
+  if (!list) return;
+  if (!allProjects.length) { list.innerHTML = '<p style="font-size:12px;color:var(--ink-light);">上传小说或新建项目后出现在这里</p>'; return; }
+  list.innerHTML = allProjects.slice(-5).map(p =>
+    `<div class="chapter-list-item" onclick="selectProject('${escapeHtml(p)}');openPanel('kb-characters');">📁 ${escapeHtml(p)}</div>`
+  ).join('');
+}
+const __origRenderProjects = renderProjectList;
+renderProjectList = function() { __origRenderProjects(); updateWelcomeProjects(); };
+
+// ============ COPY BUTTONS ============
+function addCopyButtons() {
+  document.querySelectorAll('.message.ai .msg-content').forEach(el => {
+    if (!el.parentElement.querySelector('.copy-btn')) {
+      const btn = document.createElement('button');
+      btn.className = 'copy-btn';
+      btn.textContent = '复制';
+      btn.onclick = function() {
+        navigator.clipboard.writeText(el.textContent).then(() => {
+          btn.textContent = '已复制';
+          setTimeout(() => btn.textContent = '复制', 1500);
+        });
+      };
+      el.parentElement.style.position = 'relative';
+      el.parentElement.appendChild(btn);
+    }
+  });
+}
+new MutationObserver(addCopyButtons).observe(document.body, { childList: true, subtree: true });
+
+// ============ COMMAND MENU ============
+const commands = { '/灵感':'获取写作灵感','/书名':'生成备选标题','/细纲':'展开章节细纲','/角色':'查看角色列表','/分析':'分析爽点钩子','/续写':'续写上一段','/大纲':'规划故事大纲' };
+const chatInput = document.getElementById('chatInput');
+chatInput.addEventListener('input', function() {
+  let menu = document.querySelector('.cmd-suggestions');
+  if (this.value.startsWith('/')) {
+    if (!menu) { menu = document.createElement('div'); menu.className = 'cmd-suggestions open'; this.parentElement.appendChild(menu); }
+    menu.innerHTML = Object.entries(commands).filter(([k]) => k.includes(this.value)).map(([k,d]) =>
+      `<div class="cmd-item" onclick="document.getElementById('chatInput').value='${k} ';this.closest('.cmd-suggestions').remove();document.getElementById('chatInput').focus();"><span>${k}</span><span class="cmd-desc">${d}</span></div>`
+    ).join('');
+    menu.classList.add('open');
+  } else { if (menu) menu.remove(); }
+});
+
+// ============ KEYBOARD SHORTCUTS ============
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); sendChat(); }
+  if (e.ctrlKey && e.key === 'n') { e.preventDefault(); openPanel('create-project'); }
+  if (e.ctrlKey && e.shiftKey && e.key === 'A') { e.preventDefault(); startAnalyze(); }
+  if (e.key === 'Escape') {
+    document.querySelector('.cmd-suggestions')?.remove();
+    document.getElementById('notifDropdown')?.classList.remove('open');
+  }
+});
+
+// ============ REWRITE (actual API call) ============
+async function doRegenerate() {
+  const outline = document.getElementById('outlineInput').value.trim();
+  if (!outline) { toast('没有细纲'); return; }
+  const fd = new FormData();
+  fd.append('outline', outline);
+  fd.append('genre', document.getElementById('genGenreSelect').value);
+  fd.append('word_count', document.getElementById('genWordCount').value);
+  fd.append('project', currentProject || '');
+  try { await fetch('/api/regenerate', { method: 'POST', body: fd }); toast('重新生成已启动'); addNotification('章节重新生成中', 'info'); }
+  catch(e) { toast('失败'); }
+}
+
+// Overwrite toast calls on 重写/微调 buttons to actually work
+const __origAdopt = adoptChapter;
+adoptChapter = function(btn) {
+  __origAdopt(btn);
+  const content = btn.parentElement.previousElementSibling.textContent;
+  const fd = new FormData();
+  fd.append('content', content);
+  fd.append('chapter_num', savedChaptersCount);
+  fd.append('project', currentProject || '');
+  fetch('/api/save-version', { method: 'POST', body: fd }).catch(() => {});
+  checkConsistency(content);
+};
+
+async function checkConsistency(text) {
+  const fd = new FormData();
+  fd.append('chapter', text); fd.append('project', currentProject || '');
+  try {
+    const res = await fetch('/api/consistency-check', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.issues?.length) addNotification(data.issues[0], 'warn');
+  } catch(e) {}
+}
+
+// ============ WORD COUNT ============
+const __origHandleStream = handleStreamChunk;
+handleStreamChunk = function(chunk) {
+  __origHandleStream(chunk);
+  const badge = document.getElementById('wordCountBadge');
+  if (!badge) return;
+  const count = streamBuffer.replace(/\s/g, '').length;
+  badge.textContent = '字数: ' + count;
+  badge.style.display = 'block';
+  const target = parseInt(document.getElementById('genWordCount')?.value || 1500);
+  badge.classList.toggle('reached', count >= target);
+};
+const __origFinalizeStream = finalizeStreamedChapter;
+finalizeStreamedChapter = function() {
+  __origFinalizeStream();
+  document.getElementById('wordCountBadge').style.display = 'none';
+  if (streamBuffer) checkConsistency(streamBuffer);
+};
+
+// ============ COMPARE VIEW ============
+function openCompareView(ch1, ch2) {
+  const area = document.getElementById('tabContentArea');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  let panel = document.getElementById('compare-view');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.className = 'tab-panel active';
+    panel.id = 'compare-view';
+    area.appendChild(panel);
+  }
+  panel.classList.add('active');
+  panel.innerHTML = `<h3>章节对比</h3><div class="compare-view">
+    <div class="compare-col"><h4>章节 A</h4><pre style="white-space:pre-wrap;font-size:12px;">${escapeHtml(ch1)}</pre></div>
+    <div class="compare-col"><h4>章节 B</h4><pre style="white-space:pre-wrap;font-size:12px;">${escapeHtml(ch2)}</pre></div></div>`;
+}
+
 // ============ INIT ============
 renderTabs();
+addNotification('欢迎使用小说矩阵工坊', 'info');
 </script>
 
 </body>

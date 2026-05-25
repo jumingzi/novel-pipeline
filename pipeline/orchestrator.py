@@ -65,8 +65,8 @@ class PipelineOrchestrator:
 
     def cancel(self):
         self._cancelled = True
+        self.client.cancel()
         self.state.current_step = "cancelled"
-        self.state.error = "用户手动停止"
 
     def _check_cancel(self):
         if self._cancelled:
@@ -80,6 +80,7 @@ class PipelineOrchestrator:
                              start_chapter: int = 0, end_chapter: int = 0, fast_mode: bool = True,
                              project: str = "") -> dict:
         self._cancelled = False
+        self.client.reset_cancel()
         # Fast mode: disable thinking for speed
         if fast_mode:
             import copy
